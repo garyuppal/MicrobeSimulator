@@ -20,9 +20,17 @@
 #include <functional>
 #include <algorithm>
 
-namespace MicrobeSimulator{ namespace GridGenerationTools{
+namespace MicrobeSimulator{
+    /** \brief Grid generation namespace
+    */
+    /**
+    *  Set of functions to aid mesh grid generation
+    */
+    namespace GridGenerationTools{
   using dealii::Triangulation;
 
+/** \brief Declares parameters needed for mesh generation to be read from configuration file
+*/
 void declare_parameters(ParameterHandler& prm)
 {
   prm.enter_subsection("Mesh");
@@ -36,34 +44,37 @@ void declare_parameters(ParameterHandler& prm)
   prm.leave_subsection();
 }
 
-/** CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
-* can perhaps include these in a different file ...
-*/
+// CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
+// --------------------------------------------------------------------------------------
+/// left boundary id
   const unsigned int id_left = 0;
+/// right boundary id
   const unsigned int id_right = 1;
+/// top boundary id
   const unsigned int id_top = 2;
+/// bottom boundary id
   const unsigned int id_bottom = 3;
 
-  // 3d: ( z direction )
+/// For 3d, front boundary id
   const unsigned int id_front = 4;
-  const unsigned int id_back = 5; 
+/// For 3d, back boundary id
+  const unsigned int id_back = 5;
 
-  const unsigned int id_other = 7; 
+  const unsigned int id_other = 7;
 
-  // first sphere:
+  /// first sphere:
   const unsigned int id_sphere_begin = 10;
 
-  // first rectangle:
+  /// first rectangle:
   const unsigned int id_rectangle_begin = 100;
 
   const std::array< unsigned int , 3 > lower_ids = {id_left, id_bottom, id_back};
   const std::array< unsigned int , 3 > upper_ids = {id_right, id_top, id_front};
 
 
-/** Squish Transform()
-* used to help create hex_cheese meshes ... -- should this be static or inline?
+/** Squish Transform
+* used to help create hex_cheese meshes
 */
- 
 Point<2> squish_transform (const Point<2> &in, double tile_width)
 {
 
@@ -83,47 +94,51 @@ Point<2> squish_transform (const Point<2> &in, double tile_width)
 // PROTOTYPES:
 // ========================================================================
 
-/** MESH GENERATION FROM GEOMETRY
-* in general, the geometry class will store the type of mesh desired
+/** \brief Mesh generation from geometry
+*/
+/**
+* In general, the geometry class will store the type of mesh desired
 * including a possible mesh file to read in
 * grid generation can then be given by calling the build_mesh_from_geometry
 * function. This will then call the necessary functions to construct the mesh
 */
-
 template<int dim>
 void build_mesh_from_geometry(const Geometry<dim>& geo,
                               Triangulation<dim>& tria);
 
-/** MESH FROM FILE:
+/** \brief Mesh from file
+*/
+/**
 * Import mesh from file, add boundary labels and manifolds if needed
 */
-
 template<int dim>
 void build_mesh_from_file(const Geometry<dim>& geo,
                           Triangulation<dim>& tria);
 
 
-/** SIMPLE PIPE MESH:
-* hyper rectangle from geometry end points
+/** \brief Simple pipe mesh
+*/
+/**
+* Construct hyper rectangle from geometry end points
 */
 template<int dim>
 void build_hyper_rectangle(const Geometry<dim>& geo,
                             Triangulation<dim>& tria);
 
 
-/** MIXER:
-* build_mixer_mesh takes four arguments to specify the lengths of the
-* left end, the right end, the height, and the radius of the hemispheres used
-* current implementation requires left and right lenghts be greater than height
-* we also require the radius to be less than height
-* for more uniform mesh, probably best to choose 
-* left = right = height + (height - radius)...
-* it is up to the user to make sure the geometry discription for bacteria match
-* this mesh -- not ideal, but simpler
-* @todo : could perhaps test to see if geometry agrees with mesh and warn 
-* user if not
-* mixer is mainly implemented for 2D -- for 3d, mesh is extruded in z direction
-* can include this as a default 3rd parameter ...
+/** \brief Mixer
+*/
+/**
+* This function takes four arguments to specify the lengths of the
+* left end, the right end, the height, and the radius of the hemispheres used.
+* The current implementation requires left and right lenghts be greater than the height.
+* We also require the radius to be less than height.
+* For a more uniform mesh, probably best to choose
+* left = right = height + (height - radius).
+* It is up to the user to make sure the geometry discription for bacteria match
+* this mesh.
+* @todo Could perhaps test to see if geometry agrees with mesh and warn
+* user if not. Implement 3D using extrusion.
 */
 template<int dim>
 double build_mixer_mesh(const double left_length,
@@ -133,46 +148,59 @@ double build_mixer_mesh(const double left_length,
                       Triangulation<dim>& tria,
                       const bool relabel = false);
 
-    /// helpers:
-    template<int dim> 
+    // helpers:
+    /** \brief Helper function to constuct center of mixer mesh.
+    */
+    /** Constucts the center portion of the mixer mesh, using the height
+    * and radius of the hemispheres used.
+    */
+    template<int dim>
     void construct_mixer_center(const double height,
                                 const double radius,
                                 Triangulation<dim>& tria);
+    /** \brief Helper function to generate a tile with half a sphere cut out.
+    */
+    /** This method is used by construct_mixer_center() to stack to hemispheres
+    * to build the center portion of the mixer mesh.
+    */
     template<int dim>
     void generate_half_circle_hole_tile(const double height,
                                         const double radius,
                                         Triangulation<dim>& tile);
+    // width is calculated in build_mixer_mesh, width = left - (height - radius)
 
-    /// width is calculated in build_mixer_mesh, width = left - (height - radius)
-
+    /** \brief Helper function to attach left and right ends to mixer center
+    */
     template<int dim>
     void add_mixer_ends(const double left_width,
                         const double right_width,
                         const double height,
                         Triangulation<dim>& center,
-                        Triangulation<dim>& tria); 
+                        Triangulation<dim>& tria);
 
-    /** geometry wrapper
+    /** \brief Geometry wrapper for mixer mesh
     */
-
     template<int dim>
     void build_mixer_mesh(const Geometry<dim>& geo,
                           Triangulation<dim>& tria);
 
 
 
-/** FILTERS:
-* build filter mesh takes 6 parameters ... not ideal
-* here, the height of the system is computed as 
-* (number of channels - 1)x(wall_thickness) + 
-* (number channels)xchannel_thickness 
-* mesh is constructed by attaching channels to left side and then adding 
-* the right side... -- easier might be to use cheese and distort...
-* for now use attaching method, just need to make sure cell vertices match, 
-* that is, we have the right refinements
-* currently implemented only for 2d, again, can extrude for 3d ...
-*/
+// FILTERS:
+// -----------------------------------------------------------------------------------
 
+/** \brief Function to build filter type mesh.
+*/
+/**
+* Build filter mesh takes 6 parameters.
+* A wrapper is also available to use with geometry class.
+* Here, the height of the system is computed as
+* (number of channels - 1)x(wall_thickness) +
+* (number channels)xchannel_thickness.
+* The mesh is constructed by attaching channels to left side and then adding
+* the right side.
+* @todo currently implemented only for 2d, again, can extrude for 3d
+*/
 template<int dim>
 void build_filter_mesh(const double left_length,
                       const double center_filter_length,
@@ -184,11 +212,18 @@ void build_filter_mesh(const double left_length,
                       const bool relabel = false);
 
     // helper functions:
+    /** \brief Builds sides of filter mesh
+    */
+    /**
+    * Builds side so that vertices of mesh match placement of filter channels
+    */
     void construct_filter_side(const double width,
                               const double height,
                               const std::vector< std::vector< double > > &  step_sizes,
                               Triangulation<2>& filter_side);
 
+    /** \brief Attaches filter channels to filter side tile.
+    */
     void attach_fitler_channels(const double left_length,
                                 const double center_filter_length,
                                 const unsigned int number_channels,
@@ -196,29 +231,39 @@ void build_filter_mesh(const double left_length,
                                 const double channel_thickness,
                                 Triangulation<2>& left_side);
 
-    /** geometry wrapper:
+    /** \brief geometry wrapper for filter construction
     */
     template<int dim>
     void build_filter_mesh(const Geometry<dim>& geo,
                           Triangulation<dim>& tria);
 
-/// @todo look at subdivided hyper rectangle with option to remove cells,
-    /// perhaps we can use this and attach spheres to get porous mesh...
+// @todo look at subdivided hyper rectangle with option to remove cells,
+// perhaps we can use this and attach spheres to get porous mesh...
 
 
-/** Boundary labeling and manifold attachment from geometry:
-*/
+// Boundary labeling and manifold attachment from geometry:
+// -----------------------------------------------------------------------
 
-  /** Wrapper for call with geometry object:
+  /** \brief Wrapper to call with geometry object
+  */
+  /**
+  * Assigns IDs to boundary faces and interior manifolds to allow
+  * further refinement of proper shape and to deal with boundary conditions.
+  * We attach spherical manifolds to the mesh so that refinements add vertices to
+  * the proper locations. See deal.ii documentation on manifolds for more details.
   */
   template<int dim>
   void set_boundary_and_manifolds(const Geometry<dim>& geo,
                                   Triangulation<dim>& tria,
-                                  double sphere_tolerance = -1);  
+                                  double sphere_tolerance = -1);
 
-/** SPLITTERS:
-* built similar to mixer mesh, consists of left end, a center
-* with a spherical obstacle and a right end
+// SPLITTERS:
+// ---------------------------------------------------------------------------
+/** \brief Splitter mesh with hole in center
+*/
+/**
+* Built similar to mixer mesh, consists of left end, a center
+* with a spherical obstacle and a right end.
 */
 template<int dim>
 void build_splitter_mesh(const double left_length,
@@ -227,122 +272,165 @@ void build_splitter_mesh(const double left_length,
                         const double radius,
                         Triangulation<dim>& tria);
 
-  /// helpers:
-  template<int dim>
-  double construct_splitter_center(const double height,
+    // helpers:
+    /** \brief Helper function to constuct center portion of splitter mesh
+    */
+    template<int dim>
+    double construct_splitter_center(const double height,
                                 const double radius,
                                 Triangulation<dim>& tria);
 
-  /** Wrapper for call with geometry object:
-  */
-  template<int dim>
-  void build_splitter_mesh(const Geometry<dim>& geo, 
+    /** \brief Wrapper to call with geometry object
+    */
+    template<int dim>
+    void build_splitter_mesh(const Geometry<dim>& geo,
                           Triangulation<dim>& tria);
 
-  /**
-  * General functions to set boundaries and manifolds ....
-  */
+    // General functions to set boundaries and manifolds:
+    // --------------------------------------------------------------------------------
 
-  template<int dim>
-  void set_edge_boundary_ids(const Point<dim>& bottom_left,
+    /** \brief Sets boundary IDs for outer faces of mesh
+    */
+    template<int dim>
+    void set_edge_boundary_ids(const Point<dim>& bottom_left,
                         const Point<dim>& top_right,
                         Triangulation<dim>& tria);
 
-  template<int dim>
-  void set_sphere_boundary_ids(const std::vector<Sphere<dim> >& spheres,
+    /** \brief Set IDs to inner spherical boundaries
+    */
+    template<int dim>
+    void set_sphere_boundary_ids(const std::vector<Sphere<dim> >& spheres,
                         Triangulation<dim>& tria,
                         double sphere_tolerance = -1);
 
-  template<int dim>
-  void set_rectangle_boundary_ids(const std::vector<HyperRectangle<dim> >& rects,
+    /** \brief Set IDs to inner rectangular bounaries
+    */
+    template<int dim>
+    void set_rectangle_boundary_ids(const std::vector<HyperRectangle<dim> >& rects,
                         Triangulation<dim>& tria);
 
-  template<int dim>
-  void attach_mesh_manifolds(const std::vector<Sphere<dim> >& spheres,
+    /** \brief Set any manifolds to mesh
+    */
+    /**
+    * Manifolds help to deal with further possible refinement. See deal.ii documentation
+    * on manifolds for further details.
+    */
+    template<int dim>
+    void attach_mesh_manifolds(const std::vector<Sphere<dim> >& spheres,
                               Triangulation<dim>& tria);
 
 
-/**
-* Refinement methods:
+// Refinement methods:
+// -----------------------------------------------------------------------------------
+/** \brief Refine boundaries of interior obstacles
 */
 template<int dim>
-void refine_obstacles(unsigned int sphere_refinement, 
-            const Geometry<dim>& geometry, 
+void refine_obstacles(unsigned int sphere_refinement,
+            const Geometry<dim>& geometry,
             Triangulation<dim>& triangulation);
 
-template<int dim>
-void refine_boundary(unsigned int boundary_refinement, 
-            const Geometry<dim>& geometry, 
-            Triangulation<dim>& triangulation);
-
-
-
-
-
-/** 
-* LEGACY FUNCTIONS ...
+/** \brief Refine outer boundary of mesh
 */
+template<int dim>
+void refine_boundary(unsigned int boundary_refinement,
+            const Geometry<dim>& geometry,
+            Triangulation<dim>& triangulation);
+
+
+
+
+
+// LEGACY FUNCTIONS ...
 // ----------------------------------------------------------------------------------------
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void grid_hole_cutouts(const Geometry<dim>& geo,
                       Triangulation<dim>& tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void refine_along_spheres(const Geometry<dim> & geo,
                         Triangulation<dim>& tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void cutout_spheres(const Geometry<dim> & geo,
                         Triangulation<dim>& tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
-void generateGrid(const Geometry<dim>& geo, 
+void generateGrid(const Geometry<dim>& geo,
                   Triangulation<dim>& triangulation,
                   unsigned int sphere_refinement = 0);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void generateRectangleWithHole(double height, Triangulation<2,2>& triangulation);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
-void generateGridWithHoles(const Geometry<dim>& geo, 
+void generateGridWithHoles(const Geometry<dim>& geo,
                           Triangulation<dim>& triangulation);
 
-// void printBoundaryVertices(const Triangulation<2,2>& tria);
-
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void square_pipe_with_spherical_hole(Triangulation<dim>& triangulation, double scale_factor = 1);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor = 1);
 
-
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void set_pipe_manifolds(Triangulation<dim>& triangulation, double scale_factor = 1);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void cube_with_spherical_hole(Triangulation<dim>& triangulation);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void importMeshFromFile(const Geometry<dim>& geo, Triangulation<dim>& triangulation);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
-void simpleRectangle(Triangulation<dim> &tria, 
-                     const Geometry<dim>& geo, 
+void simpleRectangle(Triangulation<dim> &tria,
+                     const Geometry<dim>& geo,
                      const bool colorize=false);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
-void squished_square_with_hole(double hole_radius, double long_side,  
+void squished_square_with_hole(double hole_radius, double long_side,
 	Triangulation<dim>& triangulation);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void swissRowsToFullMesh(double tile_height, double full_height,
     Triangulation<dim>& bottom_row, Triangulation<dim>& second_row,
     Triangulation<dim>& tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void squished_half_circle_hole(double hole_radius, double tile_width,
 	Triangulation<dim>& triangulation);
@@ -365,7 +453,7 @@ void buildMixerMesh(const Geometry<dim>& geo,
     Triangulation<dim>& triangulation, unsigned int sphere_refinement);
 
 template<int dim>
-void constructMixerCenter(double tile_width, 
+void constructMixerCenter(double tile_width,
   Triangulation<dim>& hole_tile,
   Triangulation<dim>& triangulation);
 
@@ -374,34 +462,24 @@ void addMixerEnds(double tile_width, double full_width,
   Triangulation<dim>& triangulation,
   unsigned int sphere_refinement);
 
-// void boxCheese(Triangulation<2,2> &tria, const Geometry& geo);
-
-// void constructBaseTile(double tile_width, Triangulation<2,2>& hole_tile,
-// 	Triangulation<2,2>& square_tile, Triangulation<2,2>& tria);
-
-// void baseTileToFullMesh(double full_width, double full_height, 
-// 	double base_width, Triangulation<2,2>& tria);
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void querryBoundaryFaces(const Triangulation<dim>& triangulation);
 
-
-// void generateMergedSquarePlusHole(const Point<2> bottomLeft, const Point<2> topRight,
-// 	Triangulation<2,2>& triangulation);
-
-// void generateMergedSquare(const Point<2> bottomLeft, const Point<2> topRight,
-// 	Triangulation<2,2>& triangulation);
-
-// void generateSquareHole(Triangulation<2,2>& tria);
-
-// void generateWallAdaptedMesh(Triangulation<2,2>& tria);
-
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void setEdgeBoundaries(double left, double right,
 	double top, double bottom, Triangulation<dim>& tria);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void setEdgeBoundaries(const Geometry<dim>& geo, Triangulation<dim>& triangulation);
 
+/** \brief Legacy function */
+/** @ todo: remove dependencies and delete function */
 template<int dim>
 void attach_manifolds(const Geometry<dim>& geo, Triangulation<dim>& triangulation);
 
@@ -433,7 +511,7 @@ void attach_manifolds(const Geometry<dim>& geo, Triangulation<dim>& triangulatio
 //       attach_mesh_manifolds(geo.getSpheres(), tria); //  ids already set in gmsh
 //     }
 //     // else if(geo.getMeshType() == MeshType::BOX_MESH)
-//     //   simpleRectangle(triangulation,geo,true); 
+//     //   simpleRectangle(triangulation,geo,true);
 //     // else if(geo.getMeshType() == MeshType::SQUARE_CHEESE)
 //     //   std::cout << "need to implement" << std::endl;
 //     // else if(geo.getMeshType() == MeshType::HEX_CHEESE)
@@ -452,7 +530,7 @@ void attach_manifolds(const Geometry<dim>& geo, Triangulation<dim>& triangulatio
 //     if(geo.getMeshType() == MeshType::FILE_MESH)
 //       build_mesh_from_file(geo, tria);
 //     else if(geo.getMeshType() == MeshType::BOX_MESH)
-//       simpleRectangle(tria,geo,true); 
+//       simpleRectangle(tria,geo,true);
 //     else
 //       throw std::runtime_error("Desired mesh type not valid or not implemented.");
 //   }
@@ -474,7 +552,7 @@ void build_mesh_from_geometry<2>(const Geometry<2>& geo,
     attach_mesh_manifolds(geo.getSpheres(), tria); //  ids already set in gmsh
   }
   // else if(geo.getMeshType() == MeshType::BOX_MESH)
-  //   simpleRectangle(triangulation,geo,true); 
+  //   simpleRectangle(triangulation,geo,true);
   // else if(geo.getMeshType() == MeshType::SQUARE_CHEESE)
   //   std::cout << "need to implement" << std::endl;
   // else if(geo.getMeshType() == MeshType::HEX_CHEESE)
@@ -502,7 +580,7 @@ void build_mesh_from_geometry<3>(const Geometry<3>& geo,
     if(geo.getMeshType() == MeshType::FILE_MESH)
       build_mesh_from_file(geo, tria);
     else if(geo.getMeshType() == MeshType::BOX_MESH)
-      simpleRectangle(tria,geo,true); 
+      simpleRectangle(tria,geo,true);
     else
       throw std::runtime_error("Desired mesh type not valid or not implemented.");
 
@@ -545,10 +623,9 @@ void build_hyper_rectangle(const Geometry<dim>& geo,
                                                 /*colorize*/ false); // relabeling anyways
 }
 
-/** MESH FROM FILE:
+/* MESH FROM FILE:
 * Import mesh from file, add boundary labels and manifolds if needed
 */
-
 template<int dim>
 void build_mesh_from_file(const Geometry<dim>& geo,
                           Triangulation<dim>& tria)
@@ -574,7 +651,7 @@ double build_mixer_mesh<2>(const double left_length,
                       const double radius,
                       Triangulation<2>& tria,
                       const bool relabel)
-{   
+{
   if(height < (2.*radius) )
     throw std::invalid_argument("Mixer height must be larger than diameter");
 
@@ -598,7 +675,7 @@ double build_mixer_mesh<2>(const double left_length,
 
   construct_mixer_center(height, radius, center);
 
-  add_mixer_ends(left_width, right_width, height, center, tria); 
+  add_mixer_ends(left_width, right_width, height, center, tria);
 
   if(relabel == true)
   {
@@ -624,7 +701,7 @@ template<>
 double build_mixer_mesh<3>(const double /* left_length */,
                       const double /* right_length */,
                       const double /* height */,
-                      const double /* radius */, 
+                      const double /* radius */,
                       Triangulation<3>& /* tria */,
                       const bool /* relabel */)
 {
@@ -633,7 +710,7 @@ double build_mixer_mesh<3>(const double /* left_length */,
 
 
     /// helpers:
-    template<int dim> 
+    template<int dim>
     void construct_mixer_center(const double height,
                                 const double radius,
                                 Triangulation<dim>& center)
@@ -679,7 +756,7 @@ double build_mixer_mesh<3>(const double /* left_length */,
                                                         radius,
                                                         outer_radius);
 
-  
+
         // shift so corner at origin:
         Tensor<1,dim> shift_vector;
         shift_vector[0] = outer_radius;
@@ -707,7 +784,7 @@ double build_mixer_mesh<3>(const double /* left_length */,
         shift_vector[1] = 0;
         dealii::GridTools::shift(shift_vector,hole_tile);
 
-        /// *** testing 
+        /// *** testing
         // std::ofstream out("gridcenter.eps");
         // dealii::GridOut grid_out;
         // grid_out.write_eps(hole_tile, out);
@@ -780,7 +857,7 @@ double build_mixer_mesh<3>(const double /* left_length */,
 
       /// Assuming geometry is suitable constructed for a mixer...
       const double height = geo.getWidth(1); ///geo.getTopRightPoint()[1] - geo.getBottomLeftPoint()[1];
-      
+
       // Assuming spheres are aligned along x
       const double radius = geo.getSphereAt(0).getRadius();
       const double center_x = geo.getSphereAt(0).getCenter()[0];
@@ -796,8 +873,8 @@ double build_mixer_mesh<3>(const double /* left_length */,
       if(right_length < 0)
         std::runtime_error("Top right point should be located to the right of sphere for mixer mesh");
 
-      const double buffer = build_mixer_mesh(left_length, right_length, height, radius, tria); 
-  
+      const double buffer = build_mixer_mesh(left_length, right_length, height, radius, tria);
+
       set_boundary_and_manifolds(geo, tria, 0.5*buffer);
     }
 
@@ -814,13 +891,13 @@ void build_splitter_mesh<2>(const double left_length,
 {
   Triangulation<2> center;
 
-  const double buffer = construct_splitter_center(height, radius, center); 
+  const double buffer = construct_splitter_center(height, radius, center);
   // with bottom left corner of center at origin
 
   const double left = left_length - buffer;
   const double right = right_length - buffer;
 
-  add_mixer_ends(left, right, height, center, tria); 
+  add_mixer_ends(left, right, height, center, tria);
 }
 
   /// helpers:
@@ -834,7 +911,7 @@ void build_splitter_mesh<2>(const double left_length,
 
     dealii::GridGenerator::hyper_cube_with_cylindrical_hole (tria,
                                     inner_radius,
-                                    outer_radius); 
+                                    outer_radius);
 
     // shift corner to origin:
     Tensor<1,2> shift_vector;
@@ -846,11 +923,11 @@ void build_splitter_mesh<2>(const double left_length,
     // return buffer:
     return outer_radius - inner_radius;
   }
-  
+
   /** Wrapper for call with geometry object:
   */
   template<int dim>
-  void build_splitter_mesh(const Geometry<dim>& geo, 
+  void build_splitter_mesh(const Geometry<dim>& geo,
                           Triangulation<dim>& tria)
   {
     if(geo.getNumberSpheres() != 1)
@@ -925,7 +1002,7 @@ void build_filter_mesh(const double left_length,
 
   const std::vector<std::vector<double> > right_step_sizes = {right_x_divisions, y_divisions}; /// starting from bottom left
 
-  construct_filter_side(right_length, height, right_step_sizes, filter_side); 
+  construct_filter_side(right_length, height, right_step_sizes, filter_side);
 
   // shift right side:
   Tensor<1,2>  shift_vector;
@@ -934,7 +1011,7 @@ void build_filter_mesh(const double left_length,
   dealii::GridTools::shift(shift_vector, filter_side);
 
   // merge:
-  dealii::GridGenerator::merge_triangulations(filter_side, tria, tria); 
+  dealii::GridGenerator::merge_triangulations(filter_side, tria, tria);
 
   /// @todo option to extrude if 3d
 
@@ -959,9 +1036,9 @@ void build_filter_mesh(const double left_length,
 
         std::cout << "lower: " << lower << std::endl;
         std::cout << "upper: " << upper << std::endl;
-      }  
+      }
 
-      set_rectangle_boundary_ids(rectangles, tria); 
+      set_rectangle_boundary_ids(rectangles, tria);
 
       // attach manifolds ... -- not needed
   }
@@ -1022,13 +1099,13 @@ void build_filter_mesh(const double left_length,
       const double left_length = geo.getRectangleAt(0).getBottomLeft()[0]; // assuming corner at origin
       const double center_filter_length = geo.getRectangleAt(0).getTopRight()[0]
           - geo.getRectangleAt(0).getBottomLeft()[0];
-      const double right_length = geo.getTopRightPoint()[0]  
+      const double right_length = geo.getTopRightPoint()[0]
           - geo.getRectangleAt(0).getTopRight()[0];
       const double wall_thickness = geo.getRectangleAt(0).getTopRight()[1]
           - geo.getRectangleAt(0).getBottomLeft()[1];
 
       // thickness = (height - number_rectangles*wall_thickness)/number_channels
-      const double channel_thickness = ( geo.getWidth(1) 
+      const double channel_thickness = ( geo.getWidth(1)
              - (double)geo.getNumberRectangles()*wall_thickness ) /( (double)number_channels );
 
       build_filter_mesh(left_length, center_filter_length, right_length,
@@ -1076,12 +1153,12 @@ void set_edge_boundary_ids(const Point<dim>& bottom_left,
        for (unsigned int f=0; f<dealii::GeometryInfo<dim>::faces_per_cell; ++f)
           if (cell->face(f)->at_boundary())
             for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
-                if ( std::fabs( cell->face(f)->center()[dim_itr] 
+                if ( std::fabs( cell->face(f)->center()[dim_itr]
                     - bottom_left[dim_itr] ) < edge_tolerance )
                   cell->face(f)->set_boundary_id(lower_ids[dim_itr]);
-                else if ( std::fabs( cell->face(f)->center()[dim_itr] 
+                else if ( std::fabs( cell->face(f)->center()[dim_itr]
                     - top_right[dim_itr] ) < edge_tolerance )
-                  cell->face(f)->set_boundary_id(upper_ids[dim_itr]); 
+                  cell->face(f)->set_boundary_id(upper_ids[dim_itr]);
 } // set_edge_boundary_ids()
 
 
@@ -1121,7 +1198,7 @@ void set_sphere_boundary_ids(const std::vector<Sphere<dim> >& spheres,
           ++ sphere_bid;
       } // for spheres
     } // for faces
-  } // for cells 
+  } // for cells
 } // set_sphere_boundary_ids()
 
 
@@ -1143,7 +1220,7 @@ void set_rectangle_boundary_ids(const std::vector<HyperRectangle<dim> >& rects,
       for(unsigned int i = 0; i < rects.size(); ++i)
       {
 
-        const double distance_to_rectangle_border = 
+        const double distance_to_rectangle_border =
           rects[i].distance_from_border(cell->face(f)->center());
 
         if ( distance_to_rectangle_border < edge_tolerance)
@@ -1153,7 +1230,7 @@ void set_rectangle_boundary_ids(const std::vector<HyperRectangle<dim> >& rects,
       ++bid_rect;
 
     } // for faces
-  } // for cells 
+  } // for cells
 
 
 }
@@ -1185,8 +1262,8 @@ void attach_mesh_manifolds(const std::vector<Sphere<dim> >& spheres,
 * Refinement methods:
 */
 template<int dim>
-void refine_obstacles(unsigned int obstacle_refinement, 
-            const Geometry<dim>& geometry, 
+void refine_obstacles(unsigned int obstacle_refinement,
+            const Geometry<dim>& geometry,
             Triangulation<dim>& triangulation)
 {
   for(unsigned int step = 0; step < obstacle_refinement; ++step)
@@ -1231,8 +1308,8 @@ void refine_obstacles(unsigned int obstacle_refinement,
 
 
 template<int dim>
-void refine_boundary(unsigned int boundary_refinement, 
-            const Geometry<dim>& geometry, 
+void refine_boundary(unsigned int boundary_refinement,
+            const Geometry<dim>& geometry,
             Triangulation<dim>& triangulation)
 {
   for(unsigned int step = 0; step < boundary_refinement; ++step)
@@ -1289,8 +1366,8 @@ void refine_boundary(unsigned int boundary_refinement,
 // {}
 
 template<int dim>
-void 
-generateGridWithHoles(const Geometry<dim>& geo, 
+void
+generateGridWithHoles(const Geometry<dim>& geo,
   Triangulation<dim>& triangulation)
 {
     simpleRectangle(triangulation,geo,false);
@@ -1303,13 +1380,13 @@ generateGridWithHoles(const Geometry<dim>& geo,
 }
 
 
-/* 
+/*
   generateGrid first querries geometry to see which function to call,
   from there, it passes geometry to the right helper function to generate
   the mesh
 */
 template<int dim>
-void generateGrid(const Geometry<dim>& geo, 
+void generateGrid(const Geometry<dim>& geo,
   Triangulation<dim>& triangulation, unsigned int sphere_refinement)
 {
 	if(dim == 2)
@@ -1317,7 +1394,7 @@ void generateGrid(const Geometry<dim>& geo,
 		if(geo.getMeshType() == MeshType::FILE_MESH)
 			importMeshFromFile(geo, triangulation);
 		else if(geo.getMeshType() == MeshType::BOX_MESH)
-			simpleRectangle(triangulation,geo,true); 
+			simpleRectangle(triangulation,geo,true);
 		else if(geo.getMeshType() == MeshType::SQUARE_CHEESE)
 			std::cout << "need to implement" << std::endl;
 		else if(geo.getMeshType() == MeshType::HEX_CHEESE)
@@ -1332,7 +1409,7 @@ void generateGrid(const Geometry<dim>& geo,
 		if(geo.getMeshType() == MeshType::FILE_MESH)
 			importMeshFromFile(geo, triangulation);
 		else if(geo.getMeshType() == MeshType::BOX_MESH)
-			simpleRectangle(triangulation,geo,true); 
+			simpleRectangle(triangulation,geo,true);
 		else
 			throw std::runtime_error("Desired mesh type not valid or not implemented.");
 	}
@@ -1343,7 +1420,7 @@ void generateGrid(const Geometry<dim>& geo,
 
 template<int dim>
 void
-cube_with_spherical_hole(Triangulation<dim>& triangulation) 
+cube_with_spherical_hole(Triangulation<dim>& triangulation)
 {
   // put corner at origin, unit radius sphere in 2x2 cube...
 
@@ -1352,13 +1429,13 @@ cube_with_spherical_hole(Triangulation<dim>& triangulation)
                               0.5*std::sqrt(2)
                               : 0.5*std::sqrt(3));
 
-  const double c = 0.5*std::sqrt(dim); 
+  const double c = 0.5*std::sqrt(dim);
 
   Point<dim> center = (dim == 2 ?
-                        Point<dim>(c,c) : 
+                        Point<dim>(c,c) :
                         Point<dim>(0,0,0) );
 
-  const unsigned int n_cells = (dim == 2 ? 4 : 0); 
+  const unsigned int n_cells = (dim == 2 ? 4 : 0);
 
   dealii:: GridGenerator::hyper_shell ( triangulation,
                                         center,
@@ -1378,7 +1455,7 @@ cube_with_spherical_hole(Triangulation<dim>& triangulation)
                             triangulation);
   }
   else if(dim == 3)
-  {   
+  {
         dealii::GridTools::shift(Point<dim>(0.5,0.5,0.5),
                             triangulation);
   }
@@ -1388,7 +1465,7 @@ cube_with_spherical_hole(Triangulation<dim>& triangulation)
   triangulation.set_all_manifold_ids_on_boundary (1,1);
      // set manifold_id to mimic boundary_id
 
-  
+
   if(dim == 2)
   {
     triangulation.reset_all_manifolds(); //(1); // reset outside to flat
@@ -1438,13 +1515,13 @@ void square_pipe_with_spherical_hole(Triangulation<dim>& triangulation, double s
 
 	dealii::GridTools::shift(shift_vector, triangulation); // shift right in x
 
-	dealii::GridGenerator::merge_triangulations(auxillary,triangulation,triangulation); 
+	dealii::GridGenerator::merge_triangulations(auxillary,triangulation,triangulation);
 
-	shift_vector[0] = 2.0; 
-	dealii::GridTools::shift(shift_vector, auxillary); 
+	shift_vector[0] = 2.0;
+	dealii::GridTools::shift(shift_vector, auxillary);
 	dealii::GridGenerator::merge_triangulations(triangulation,auxillary,triangulation);
 
-	dealii::GridTools::scale(scale_factor, triangulation); 
+	dealii::GridTools::scale(scale_factor, triangulation);
 
 	// need to reattach manifolds... and assign boundary ids ...
 	set_pipe_edges(triangulation, scale_factor);
@@ -1455,11 +1532,11 @@ template<int dim>
 void
 set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 {
-	
+
 	// edges at x = 0, x = 3
 	// y = 0, y = 1; z = 0, z = 1
 
-	const double sphere_tolerance = 0.2; // may need to make this better... 
+	const double sphere_tolerance = 0.2; // may need to make this better...
 	// can maybe make coarser, since coarse mesh shouldn't have a problem
 
 	const double edge_tolerance = 1e-8;
@@ -1471,9 +1548,9 @@ set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 
 	// 3d: ( z direction )
 	const unsigned int id_front = 4;
-	const unsigned int id_back = 5; 
+	const unsigned int id_back = 5;
 
-	const unsigned int id_other = 7; 
+	const unsigned int id_other = 7;
 
 	// triangulation.set_all_boundary_ids(id_other);
 
@@ -1481,7 +1558,7 @@ set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 
 	const double radius = 0.25;
 	const Point<dim> sphere_center = (dim == 2 ?
-                        Point<dim>(scale_factor*1.5, scale_factor*0.5) : 
+                        Point<dim>(scale_factor*1.5, scale_factor*0.5) :
                         Point<dim>(scale_factor*1.5, scale_factor*0.5, scale_factor*0.5) );
 
 	std::array< unsigned int , 3 > lower_ids = {id_left, id_bottom, id_back};
@@ -1490,7 +1567,7 @@ set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 	Point<dim> lower;
 	Point<dim> upper;
 	upper[0] = scale_factor*3.;
-	
+
 	for(unsigned int dim_itr = 1; dim_itr < dim; ++dim_itr)
 		upper[dim_itr] = scale_factor*1.;
 
@@ -1506,14 +1583,14 @@ set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 		    {
 		    	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
 		    	{
-			        if ( std::fabs( cell->face(f)->center()[dim_itr] 
+			        if ( std::fabs( cell->face(f)->center()[dim_itr]
 	  		          - lower[dim_itr] ) < edge_tolerance )
 			        {
 				          cell->face(f)->set_boundary_id(lower_ids[dim_itr]);
 				          std::cout << lower_ids[dim_itr] << ": set at " <<
 				          	cell->face(f)->center() << std::endl;
 			        }
-			        else if ( std::fabs( cell->face(f)->center()[dim_itr] 
+			        else if ( std::fabs( cell->face(f)->center()[dim_itr]
 			          - upper[dim_itr] ) < edge_tolerance )
 			        {
 				          cell->face(f)->set_boundary_id(upper_ids[dim_itr]);
@@ -1543,7 +1620,7 @@ set_pipe_edges(Triangulation<dim>& triangulation, double scale_factor)
 		} // for faces
 
     } // for cells
- 
+
 }
 
 
@@ -1568,7 +1645,7 @@ set_pipe_manifolds(Triangulation<dim>& triangulation, double scale_factor)
 }
 
 template<int dim>
-void 
+void
 generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
 {
   if(dim != 2)
@@ -1589,7 +1666,7 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
                                             bottomLeft,
                                             topCorner);
 
-  // center third: 
+  // center third:
   const double outer_radius = 0.5*height;
   const double inner_radius = 0.5*outer_radius;
 
@@ -1619,9 +1696,9 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
   dealii::GridTools::shift(shift_vector,temporary);
   dealii::GridGenerator::merge_triangulations(temporary,triangulation,triangulation);
 
-  // assign boundary ids and manifolds:  
+  // assign boundary ids and manifolds:
   // boundary ids:
-  const double tolerance = 0.1; 
+  const double tolerance = 0.1;
   // can maybe make coarser, since coarse mesh shouldn't have a problem
 
 
@@ -1655,9 +1732,9 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
   Point<2> center(1.5*height, 0.5*height);
   const double radius = inner_radius;
 
-  unsigned int sphere_bid = 10; // start at 10 
+  unsigned int sphere_bid = 10; // start at 10
 
-  for(typename Triangulation<2>::active_cell_iterator 
+  for(typename Triangulation<2>::active_cell_iterator
         cell = triangulation.begin_active();
         cell != triangulation.end();
         ++cell)
@@ -1671,12 +1748,12 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
       } // for faces
     } // for cells
 
-  // manifolds: 
+  // manifolds:
     triangulation.reset_all_manifolds();
-    
+
     const unsigned int inner_manifold_id = 0;
     triangulation.set_all_manifold_ids(inner_manifold_id);
-    
+
     // unsigned int sphere_bid = 6; // start at 6 by convention .. may need to change for 3D
     unsigned int sphere_manifold_id = 1; // start at 1
 
@@ -1685,13 +1762,13 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
       triangulation.set_all_manifold_ids_on_boundary(sphere_bid, sphere_manifold_id);
 
       dealii::SphericalManifold<dim> sphere_manifold(center); // polar vs circle?
-      triangulation.set_manifold (sphere_manifold_id, sphere_manifold);   
+      triangulation.set_manifold (sphere_manifold_id, sphere_manifold);
 
       // ++sphere_bid;
       // ++sphere_manifold_id;
     // }
 
-   
+
     dealii::TransfiniteInterpolationManifold<dim> inner_manifold;
     inner_manifold.initialize(triangulation);
     triangulation.set_manifold (inner_manifold_id, inner_manifold);
@@ -1700,9 +1777,9 @@ generateRectangleWithHole(double height, Triangulation<2,2>& triangulation)
 
 
 template<int dim>
-void 
-importMeshFromFile(const Geometry<dim>& geo, 
-  Triangulation<dim>& triangulation) 
+void
+importMeshFromFile(const Geometry<dim>& geo,
+  Triangulation<dim>& triangulation)
 {
   dealii::GridIn<dim> grid_in;
 	grid_in.attach_triangulation(triangulation);
@@ -1715,11 +1792,11 @@ importMeshFromFile(const Geometry<dim>& geo,
   // scale if needed:
   if(geo.getScaleFactor() != 1)
     dealii::GridTools::scale(geo.getScaleFactor(), triangulation);
-	
+
   // color boundaries...
   // setEdgeBoundaries(geo.getBottomLeftPoint()[0], geo.getTopRightPoint()[0],
-  //     geo.getTopRightPoint()[1], geo.getBottomLeftPoint()[1], 
-  //     triangulation); 
+  //     geo.getTopRightPoint()[1], geo.getBottomLeftPoint()[1],
+  //     triangulation);
   setEdgeBoundaries(geo, triangulation);
 
 
@@ -1732,13 +1809,13 @@ importMeshFromFile(const Geometry<dim>& geo,
 template<int dim>
 void
 attach_manifolds(const Geometry<dim>& geo,
-    Triangulation<dim>& triangulation) 
+    Triangulation<dim>& triangulation)
 {
     triangulation.reset_all_manifolds();
-    
+
     const unsigned int inner_manifold_id = 0;
     triangulation.set_all_manifold_ids(inner_manifold_id);
-    
+
     const unsigned int number_spheres = geo.getNumberSpheres();
     unsigned int sphere_bid = 10; // start at 6 by convention .. may need to change for 3D
     unsigned int sphere_manifold_id = 1; // start at 1
@@ -1748,13 +1825,13 @@ attach_manifolds(const Geometry<dim>& geo,
       triangulation.set_all_manifold_ids_on_boundary(sphere_bid, sphere_manifold_id);
 
       dealii::SphericalManifold<dim> sphere_manifold(geo.getSphereAt(i).getCenter()); // polar vs circle?
-      triangulation.set_manifold (sphere_manifold_id, sphere_manifold);   
+      triangulation.set_manifold (sphere_manifold_id, sphere_manifold);
 
       ++sphere_bid;
       ++sphere_manifold_id;
     }
 
-   
+
     dealii::TransfiniteInterpolationManifold<dim> inner_manifold;
     inner_manifold.initialize(triangulation);
     triangulation.set_manifold (inner_manifold_id, inner_manifold);
@@ -1762,9 +1839,9 @@ attach_manifolds(const Geometry<dim>& geo,
 
 
 template<int dim>
-void 
-simpleRectangle(Triangulation<dim> &tria, 
-			const Geometry<dim>& geo, const bool colorize) 
+void
+simpleRectangle(Triangulation<dim> &tria,
+			const Geometry<dim>& geo, const bool colorize)
 {
   // @todo ***LEFT OFF HERE ***
   // subdivide to account for non equal widths ...
@@ -1835,9 +1912,9 @@ void refine_along_spheres(const Geometry<dim> & geometry,
 
     for(unsigned int step = 0; step < sphere_refinement; ++step)
     {
-        const double min_diameter = 1.0 * 
+        const double min_diameter = 1.0 *
           dealii::GridTools::minimal_cell_diameter(triangulation); // use as a guide...
-        // refine radius +/- cell diameter, 
+        // refine radius +/- cell diameter,
         // until local cell diameter is ...
 
       for(unsigned int i = 0; i < number_spheres; i++)
@@ -1921,8 +1998,8 @@ void cutout_spheres(const Geometry<dim> & geometry,
 
 
 template<int dim>
-void 
-swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria) 
+void
+swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -1938,7 +2015,7 @@ swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria)
   const double tile_width = 5.0;
   const double hole_radius = 0.25;
   const double tile_height = 0.5*std::sqrt(3)*tile_width;
-  // need to check here if tilable ... if radius is small enough given spacing 
+  // need to check here if tilable ... if radius is small enough given spacing
   // radius must be smaller than height
 
   squished_square_with_hole(hole_radius, tile_width, hole_tile);
@@ -1946,7 +2023,7 @@ swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria)
 
   // need two rows:
   const double full_width = 9*tile_width; //geo.getXMax()-geo.getXMin();
-  const double full_height = 8*tile_height; //geo.getYMax()-geo.getYMin(); 
+  const double full_height = 8*tile_height; //geo.getYMax()-geo.getYMin();
 
   Triangulation<dim> bottom_row;
   bottom_row.copy_triangulation(hole_tile);
@@ -1969,10 +2046,10 @@ swissCheese(const Geometry<dim>& geo, Triangulation<dim> &tria)
 
 
 template<int dim>
-void 
+void
 swissRowsToFullMesh(double tile_height, double full_height,
     Triangulation<dim>& bottom_row, Triangulation<dim>& second_row,
-    Triangulation<dim>& tria) 
+    Triangulation<dim>& tria)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -1992,7 +2069,7 @@ swissRowsToFullMesh(double tile_height, double full_height,
   dealii::GridTools::shift(shift_vector,second_row);
   dealii::GridGenerator::merge_triangulations(bottom_row,second_row,tria);
 
-  shift_vector[1] = 2*tile_height;  
+  shift_vector[1] = 2*tile_height;
   for(unsigned int i = 0; i < n_y_stackings; i+=2)
   {
     dealii::GridTools::shift(shift_vector,bottom_row);
@@ -2003,9 +2080,9 @@ swissRowsToFullMesh(double tile_height, double full_height,
 }
 
 template<int dim>
-void 
+void
 constructSwissBottomRow(double tile_width, double full_width,
-   Triangulation<dim>& hole_tile, Triangulation<dim>& bottom_row) 
+   Triangulation<dim>& hole_tile, Triangulation<dim>& bottom_row)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2021,7 +2098,7 @@ constructSwissBottomRow(double tile_width, double full_width,
     dealii::GridGenerator::merge_triangulations(hole_tile,bottom_row,bottom_row);
   }
 
-  // // shift back 
+  // // shift back
   // std::cout << "number tiles: " << number_tiles << std::endl;
   shift_vector[0] = -number_tiles*tile_width;
   shift_vector[1] = 0;
@@ -2032,8 +2109,8 @@ constructSwissBottomRow(double tile_width, double full_width,
 
 template<int dim>
 void
-squished_square_with_hole(double hole_radius, double tile_width,  
-  Triangulation<dim>& triangulation) 
+squished_square_with_hole(double hole_radius, double tile_width,
+  Triangulation<dim>& triangulation)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2063,10 +2140,10 @@ squished_square_with_hole(double hole_radius, double tile_width,
 
 
 template<int dim>
-void 
+void
 constructSwissSecondRow(double tile_width, double full_width,
     Triangulation<dim>& half_circle, Triangulation<dim>&hole_tile,
-    Triangulation<dim>& second_row) 
+    Triangulation<dim>& second_row)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2098,9 +2175,9 @@ constructSwissSecondRow(double tile_width, double full_width,
 
 
 template<int dim>
-void 
+void
 generateHalfCircleHole(double hole_radius, double tile_width,
-  Triangulation<dim>& triangulation, unsigned int sphere_refinement) 
+  Triangulation<dim>& triangulation, unsigned int sphere_refinement)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2108,7 +2185,7 @@ generateHalfCircleHole(double hole_radius, double tile_width,
   // start with rectangle with hole:
   Triangulation<dim>    hole_tile;
   // const double hole_radius = 0.25;
-  // const double tile_width = 1.0; 
+  // const double tile_width = 1.0;
 
   dealii::GridGenerator::hyper_cube_with_cylindrical_hole(hole_tile,
                                                 hole_radius,
@@ -2171,9 +2248,9 @@ generateHalfCircleHole(double hole_radius, double tile_width,
 }
 
 template<int dim>
-void 
+void
 squished_half_circle_hole(double hole_radius, double tile_width,
-  Triangulation<dim>& triangulation) 
+  Triangulation<dim>& triangulation)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2186,7 +2263,7 @@ squished_half_circle_hole(double hole_radius, double tile_width,
   // shift back down to origin:
   double difference = (1.0 - 0.5*std::sqrt(3))*tile_width;
   double down_shift = -0.5*difference;
-     
+
   Tensor<1,dim> shift_vector;
   shift_vector[0] = down_shift;
   shift_vector[1] = 0;
@@ -2196,9 +2273,9 @@ squished_half_circle_hole(double hole_radius, double tile_width,
 
 
 template<int dim>
-void 
-buildMixerMesh(const Geometry<dim>& geo, 
-  Triangulation<dim>& triangulation, unsigned int sphere_refinement) 
+void
+buildMixerMesh(const Geometry<dim>& geo,
+  Triangulation<dim>& triangulation, unsigned int sphere_refinement)
 {
   // std::cout << "In buildMixerMesh() ... can perhaps extrude for 3d ..."
   //   << std::endl;
@@ -2228,10 +2305,10 @@ buildMixerMesh(const Geometry<dim>& geo,
 }
 
 template<int dim>
-void 
-constructMixerCenter(double tile_width, 
+void
+constructMixerCenter(double tile_width,
   Triangulation<dim>& hole_tile,
-  Triangulation<dim>& triangulation)  
+  Triangulation<dim>& triangulation)
 {
   const double angle = 0.5*dealii::numbers::PI;
   dealii::GridTools::rotate(angle,triangulation); // bottom
@@ -2254,10 +2331,10 @@ constructMixerCenter(double tile_width,
 }
 
 template<int dim>
-void 
+void
 addMixerEnds(double tile_width, double full_width,
   Triangulation<dim>& triangulation,
-  unsigned int sphere_refinement) 
+  unsigned int sphere_refinement)
 {
   const double center_shift = 0.5*(full_width-tile_width);
 
@@ -2299,7 +2376,7 @@ void MyGridGenerator::boxCheese(Triangulation<2,2> &tria, const Geometry& geo)
   Triangulation<2>    hole_tile;
 
   const double tile_width = geo.getTileWidth(); // this should eventually be a member of geometry
-  const double hole_radius = geo.circleAt(0)->getRadius(); 
+  const double hole_radius = geo.circleAt(0)->getRadius();
 
   const Point<2> bottomLeft(0, 0);
   const Point<2> topRight(tile_width,tile_width);
@@ -2328,7 +2405,7 @@ void MyGridGenerator::boxCheese(Triangulation<2,2> &tria, const Geometry& geo)
 
 
   const double full_width = geo.getXMax()-geo.getXMin();
-  const double full_height = geo.getYMax()-geo.getYMin(); 
+  const double full_height = geo.getYMax()-geo.getYMin();
   const double base_width = 2*tile_width;
 
   baseTileToFullMesh(full_width,full_height,base_width,tria);
@@ -2368,7 +2445,7 @@ void MyGridGenerator::constructBaseTile(double tile_width, Triangulation<2,2>& h
 }
 
 
-void MyGridGenerator::baseTileToFullMesh(double full_width, double full_height, 
+void MyGridGenerator::baseTileToFullMesh(double full_width, double full_height,
     double base_width, Triangulation<2,2>& tria)
 {
   const unsigned int n_x_stackings = full_width/base_width - 1;
@@ -2381,7 +2458,7 @@ void MyGridGenerator::baseTileToFullMesh(double full_width, double full_height,
   base_tile.copy_triangulation(tria);
 
   Tensor<1,2> shift_vector;
-  
+
   // stack along width:
   shift_vector[0] = base_width;
   shift_vector[1] = 0;
@@ -2396,7 +2473,7 @@ void MyGridGenerator::baseTileToFullMesh(double full_width, double full_height,
   base_tile.copy_triangulation(tria);
 
   // stack along height:
-  shift_vector[0] = 0; 
+  shift_vector[0] = 0;
   shift_vector[1] = base_width;
 
   for(unsigned int i = 0; i < n_y_stackings; i++)
@@ -2411,8 +2488,8 @@ void MyGridGenerator::baseTileToFullMesh(double full_width, double full_height,
 
 // print out locations of boundary faces and their boundary id:
 template<int dim>
-void 
-querryBoundaryFaces(const Triangulation<dim>& triangulation) 
+void
+querryBoundaryFaces(const Triangulation<dim>& triangulation)
 {
   for (typename Triangulation<dim>::active_cell_iterator
        cell = triangulation.begin_active();
@@ -2438,7 +2515,7 @@ querryBoundaryFaces(const Triangulation<dim>& triangulation)
 
 /*
 
-void MyGridGenerator::generateMergedSquare(const Point<2> bottomLeft, 
+void MyGridGenerator::generateMergedSquare(const Point<2> bottomLeft,
   const Point<2> topRight, Triangulation<2,2>& triangulation)
 {
   Triangulation<2,2> temp_mesh;
@@ -2486,7 +2563,7 @@ void MyGridGenerator::generateMergedSquare(const Point<2> bottomLeft,
 
 
 
-void MyGridGenerator::generateMergedSquarePlusHole(const Point<2> bottomLeft, 
+void MyGridGenerator::generateMergedSquarePlusHole(const Point<2> bottomLeft,
   const Point<2> topRight, Triangulation<2,2>& triangulation)
 {
   Triangulation<2,2> temp_mesh;
@@ -2633,7 +2710,7 @@ void MyGridGenerator::generateWallAdaptedMesh(Triangulation<2,2>& triangulation)
 //   const double angle = numbers::PI;
 //   dealii::GridTools::rotate(angle,copy_tria);
 
-//   Tensor<1,2> shift_vector; 
+//   Tensor<1,2> shift_vector;
 //   shift_vector[0] = 2*2.75;
 //   shift_vector[1] = 2*2.75;
 //   dealii::GridTools::shift(shift_vector,copy_tria);
@@ -2671,7 +2748,7 @@ void MyGridGenerator::generateWallAdaptedMesh(Triangulation<2,2>& triangulation)
 //   shift_vector[1] = -2.75*2;
 
 //   dealii::GridTools::shift(shift_vector,copy_tria);
-//   GridGenerator::merge_triangulations(copy_tria,tria,tria);  
+//   GridGenerator::merge_triangulations(copy_tria,tria,tria);
 
 
 // // remove hanging nodes to refine coarse squares:
@@ -2722,16 +2799,16 @@ void MyGridGenerator::generateWallAdaptedMesh(Triangulation<2,2>& triangulation)
 
 /*
   boxCheese constructs a square packed mesh of holes given by geometry
-  boxCheese assumes circles in geometry are square packed and creates a 
+  boxCheese assumes circles in geometry are square packed and creates a
   base square tile and hole tile given by a circle element in geometry
 
   might want a function that calculates the bounding box and tile width first...
 */
 
 template<int dim>
-void 
+void
 setEdgeBoundaries(double left, double right,
-  double top, double bottom, Triangulation<dim>& triangulation) 
+  double top, double bottom, Triangulation<dim>& triangulation)
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -2786,14 +2863,14 @@ setEdgeBoundaries(double left, double right,
 
 
 template<int dim>
-void 
-setEdgeBoundaries(const Geometry<dim>& geo, 
-  Triangulation<dim>& triangulation) 
+void
+setEdgeBoundaries(const Geometry<dim>& geo,
+  Triangulation<dim>& triangulation)
 {
   if(dim != 2)
     throw std::runtime_error("Function not implemented for dim != 2");
 
-  const double sphere_tolerance = 0.3; // may need to make this better... 
+  const double sphere_tolerance = 0.3; // may need to make this better...
   // can maybe make coarser, since coarse mesh shouldn't have a problem
 
   const double edge_tolerance = 1e-8;
@@ -2812,16 +2889,16 @@ setEdgeBoundaries(const Geometry<dim>& geo,
     if (cell->face(f)->at_boundary())
     {
       // std::cout << "yo" << std::endl;
-        if ( std::fabs( cell->face(f)->center()[0] 
+        if ( std::fabs( cell->face(f)->center()[0]
           - geo.getBottomLeftPoint()[0] ) < edge_tolerance )
           cell->face(f)->set_boundary_id(id_left);
-        else if ( std::fabs( cell->face(f)->center()[0] 
+        else if ( std::fabs( cell->face(f)->center()[0]
           - geo.getTopRightPoint()[0] ) < edge_tolerance )
           cell->face(f)->set_boundary_id(id_right);
-        else if ( std::fabs( cell->face(f)->center()[1] 
+        else if ( std::fabs( cell->face(f)->center()[1]
           - geo.getTopRightPoint()[1] ) < edge_tolerance )
           cell->face(f)->set_boundary_id(id_top);
-        else if ( std::fabs( cell->face(f)->center()[1] 
+        else if ( std::fabs( cell->face(f)->center()[1]
           - geo.getBottomLeftPoint()[1] ) < edge_tolerance )
           cell->face(f)->set_boundary_id(id_bottom);
         else
@@ -2838,7 +2915,7 @@ setEdgeBoundaries(const Geometry<dim>& geo,
 
 std::cout << "sphere: " << center << " ; " << radius << " ....." << std::endl;
 
-    for(typename Triangulation<2>::active_cell_iterator 
+    for(typename Triangulation<2>::active_cell_iterator
         cell = triangulation.begin_active();
         cell != triangulation.end();
         ++cell)

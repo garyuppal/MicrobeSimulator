@@ -8,13 +8,13 @@
 #include <ctime>
 #include <string>
 #include <sstream>
-#include <chrono> 
+#include <chrono>
 #include <functional>
 
 // *************************************************************************************
 // @ todo:
 // *** can add a small slip velocity (can even make this a parameter)
-// - run base tests: 
+// - run base tests:
 	// initial group locations?
 		// - check parsing, still bug with initial locations comment on same line
 // - run filter and mixer tests (need initial location)
@@ -39,18 +39,18 @@ int main(int argc, char** argv)
 	dealii::MultithreadInfo::set_thread_limit(1);
 	try
     {
-		using namespace std::chrono; 
+		using namespace std::chrono;
 		using namespace MicrobeSimulator;
 
 		/// start time (for timing)
-		auto start = high_resolution_clock::now(); 
+		auto start = high_resolution_clock::now();
 
 		// parse command line:
 		CommandLineParameters cmd_prm(argc,argv);
 		// also creates output directory
 
 		cmd_prm.print(std::cout);
-		
+
 		/// iniitialze random seed
 		// const unsigned int seed =  time(0) + cmd_prm.getJobID(); // + parameters.getJobID(); // 100; //
 		// std::cout << "Using Seed: " << seed << std::endl;
@@ -70,11 +70,11 @@ int main(int argc, char** argv)
 */
 
 		/// end time, to get run time:
-		auto stop = high_resolution_clock::now(); 
-		auto duration = duration_cast<seconds>(stop - start); 
+		auto stop = high_resolution_clock::now();
+		auto duration = duration_cast<seconds>(stop - start);
 
 		std::cout << "\n\n\nTotal program run time: "
-		<< duration.count() << " seconds\n\n" << std::endl; 
+		<< duration.count() << " seconds\n\n" << std::endl;
 
     }
 	catch (std::exception &exc)
