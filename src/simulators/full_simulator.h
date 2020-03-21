@@ -42,6 +42,8 @@ class FullSimulator{
 public:
 	FullSimulator(const CommandLineParameters& cmd_prm);
 	void run();
+	// void run_cycles(); // don't need this, just reintro
+
 	void function_test();
 	void test_chemical_flow();
 private:
@@ -58,7 +60,7 @@ private:
 	BacteriaNew::OR_Fitness<dim>						fitness_function;
 		// type of fitness given by parameter as well***
 
-	// std::vector<double>									pg_rates;
+	std::vector<double>									pg_rates;
 
 	// SYSTEM CONSTANTS:
 	std::string 										output_directory;
@@ -77,12 +79,15 @@ private:
 	// for adding in new groups:
 	unsigned int 										number_reintroduced;
 
+	double edge_buffer;
+
 	// output:
 	void output_bacteria() const;
-	void output_chemicals() const;
+	void output_chemicals(bool isGridSave) const;
 
 	// update:
 	void update_bacteria();
+	void reintro_bacteria(); 
 
 	// setup:
 	void setup_system(); // can even move this outside of this class,
@@ -142,7 +147,8 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	save_step_number(0),
 	time_step_number(0),
 	bacteria_time_step_multiplier(1),
-	number_reintroduced(0)
+	number_reintroduced(0),
+	edge_buffer(0)
 {}
 
 template<int dim>
@@ -190,13 +196,14 @@ FullSimulator<dim>::run_microbes()
 {
 	std::cout << std::endl << std::endl
 		<< "Starting microbe simulation" << std::endl
-		<<"--------------------------------------------------------------------"
-		<< std::endl << std::endl;
+		<< Utility::long_line << std::endl
+		<< Utility::long_line << std::endl << std::endl;
 
 	// save period:
 	const unsigned int modsave
 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
 	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+	const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
 
 	// spread out intial bacteria...
 	const unsigned int intial_spread = 15;
@@ -207,9 +214,12 @@ FullSimulator<dim>::run_microbes()
 	output_bacteria();
 	++save_step_number;
 
+	const bool reintro = prm.get_bool("Bacteria","Reintroducing");
+	bool dont_kill = true;
+
 	do{
-		// if(parameters->isAddingNewGroups())
-		// 	reintro_bacteria();
+		if(reintro)
+			reintro_bacteria();
 
 		// update time:
 		time += chemical_time_step;
@@ -220,25 +230,54 @@ FullSimulator<dim>::run_microbes()
 		{
 			std::cout << "saving at time: " << time << std::endl;
 			if(isSavingChemicals)
-				output_chemicals(); // *** try saving projected version to triple check***
+				output_chemicals(isGridSave); // *** try saving projected version to triple check***
 			output_bacteria();
 			++save_step_number;
 		}
 
-		// chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates());
+		/** @todo give option to have some controls be "none", or add constant zero type
+		*/
 
-		control_functions.update_time(chemical_time_step); // increment internal clock
-		chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates(), control_functions);
+		if(control_functions.isActive())
+		{
+			control_functions.update_time(chemical_time_step); // increment internal clock
+			chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates(), control_functions);
+		}
+		else
+		{
+			chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates());
+		}
 
 		if(time_step_number % bacteria_time_step_multiplier == 0)
 			update_bacteria();
 			// std::cout << "number bacteria: " << bacteria.getTotalNumber() << std::endl;
 
-	   	if( !bacteria.isAlive() )
-	   		std::cout << "\n\nEverybody died!" << std::endl;
-	}while( (time < run_time) && bacteria.isAlive() );
+		if(!reintro)
+		{
+		   	if( !bacteria.isAlive() )
+		   	{
+		   		dont_kill = false;
+		   		std::cout << "\n\nEverybody died!" << std::endl;
+		   	}
+	    }
+	}while( (time < run_time) && dont_kill );
 
-	// SimulationTools::output_vector(pg_rates,"pg_rates",output_directory);
+	if(reintro)
+		SimulationTools::output_vector(pg_rates,"pg_rates",output_directory);
+}
+
+template<int dim>
+void
+FullSimulator<dim>::reintro_bacteria()
+{
+	const unsigned int intro_number = 
+		std::floor(time/(prm.get_double("Bacteria","Reintroduction period")));
+
+	if(intro_number > number_reintroduced)
+	{
+		bacteria.reintro(prm, geometry);
+		++number_reintroduced;
+	}	
 }
 
 template<int dim>
@@ -315,7 +354,9 @@ template<int dim>
 void
 FullSimulator<dim>::update_bacteria()
 {
-	bacteria.randomWalk(bacteria_time_step, geometry, velocity_function);
+	bacteria.randomWalk(bacteria_time_step, geometry, velocity_function, 
+		pg_rates, edge_buffer); 
+	// append to fallen rates
 
 	bacteria.reproduce(bacteria_time_step, fitness_function);
 
@@ -339,9 +380,12 @@ FullSimulator<dim>::output_bacteria() const
 
 template<int dim>
 void
-FullSimulator<dim>::output_chemicals() const
+FullSimulator<dim>::output_chemicals(bool isGridSave) const
 {
-	chemicals.output(output_directory, save_step_number);
+	if(isGridSave)
+		chemicals.output_grid(output_directory, save_step_number, geometry);
+	else
+		chemicals.output(output_directory, save_step_number);
 }
 
 
@@ -365,7 +409,7 @@ FullSimulator<dim>::setup_system()
 	BacteriaNew::Fitness::declare_parameters(prm);
 
 	prm.parse_parameter_file();
-	prm.print(std::cout);
+	prm.print_simple(std::cout);
 	std::ofstream out(output_directory + "/parameters.dat");
 	prm.print(out);
 
@@ -404,6 +448,8 @@ FullSimulator<dim>::setup_system()
 	std::cout << "...setting up bacteria" << std::endl;
 		bacteria.init(prm, geometry);
 		bacteria.printInfo(std::cout);
+
+		edge_buffer = prm.get_double("Bacteria","Edge buffer");
 
 	std::cout << "...setting up fitness" << std::endl;
 		setup_fitness();

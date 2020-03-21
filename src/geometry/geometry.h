@@ -1028,51 +1028,59 @@ for(unsigned int i = 0; i < rectangles.size(); i++)
 
 // FUNCTIONS:
 template<int dim>
-void Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
-const double buffer) const
+void 
+Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
+								const double buffer) const
 {
-// check interior obstacles:
-unsigned int number_spheres = spheres.size();
-for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
- if(isInSphere(sphere_id,newPoint, buffer))
- {
-   reflectSphere(sphere_id,oldPoint,newPoint, buffer); /// @todo move to sphere class
-   break; // assuming don't hit mutliple circles -- otherwise need to do something else
- }
+	const double tolerance = 1e-8;
 
-/// check interior rectangles:
-unsigned int number_rectangles = rectangles.size();
-for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
- if( rectangles[rect_id].distance_from_border(newPoint) < 1e-8 )
- {
-   rectangles[rect_id].reflectPoint(oldPoint, newPoint); // buffer optional
-   break;        
- }
+	// check interior spheres:
+	unsigned int number_spheres = spheres.size();
+	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
+		// if( (spheres[sphere_id].distance_from_border(newPoint) - buffer) < tolerance)
+		// {
+		// 	spheres[sphere_id].reflectPoint(oldPoint, newPoint, buffer); 
+		// 	break;
+		// }
+		if(isInSphere(sphere_id,newPoint, buffer))
+		{
+			reflectSphere(sphere_id,oldPoint,newPoint, buffer); /** @todo move to sphere class */
+			break; // assuming don't hit mutliple circles -- otherwise need to do something else
+		}
 
-/// @ todo: add possible buffer to edges ....
+	// check interior rectangles:
+	unsigned int number_rectangles = rectangles.size();
+	for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
+		if( (rectangles[rect_id].distance_from_border(newPoint) - buffer) < tolerance ) // add buffer here too!!
+		{
+			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); // buffer optional
+			break;        
+		}
 
-// check bounding box:
-for(unsigned int i = 0; i < dim; i++)
-{
-   // bottom_left gives lower boundaries, top_right gives upper
- if( newPoint[i] < bottom_left[i] )
- {
-   if(boundary_conditions[i] == BoundaryCondition::WRAP)
-     newPoint[i] = newPoint[i] + (top_right[i] - bottom_left[i]);
-   else //if(boundary_conditions[i] == BoundaryCondition::REFLECT)
-     newPoint[i] = 2*bottom_left[i] - newPoint[i];
-     // -- use reflect for open as well on left
- }
- else if(newPoint[i] > top_right[i])
- {
-   if(boundary_conditions[i] == BoundaryCondition::WRAP)
-     newPoint[i] = newPoint[i] - (top_right[i] - bottom_left[i]);
-   else if(boundary_conditions[i] == BoundaryCondition::REFLECT)
-     newPoint[i]= 2*top_right[i] - newPoint[i];
-   // else --- is open
- }
-} // for dim
-} 
+	// check bounding box:
+	for(unsigned int i = 0; i < dim; i++)
+	{
+		// bottom_left gives lower boundaries, top_right gives upper
+		if( newPoint[i] < (bottom_left[i]+buffer) )
+		{
+			if( ( newPoint[i] < bottom_left[i] ) && 
+				(boundary_conditions[i] == BoundaryCondition::WRAP) )
+				 newPoint[i] = newPoint[i] + (top_right[i] - bottom_left[i]);
+			else //if(boundary_conditions[i] == BoundaryCondition::REFLECT)
+				 newPoint[i] = 2.0*(bottom_left[i]+buffer) - newPoint[i]; 
+			 	// -- use reflect for open as well on left
+		}
+		else if( newPoint[i] > (top_right[i]-buffer) )
+		{
+			if( (newPoint[i] > top_right[i]) &&
+				(boundary_conditions[i] == BoundaryCondition::WRAP) )
+				 newPoint[i] = newPoint[i] - (top_right[i] - bottom_left[i]);
+			else if(boundary_conditions[i] == BoundaryCondition::REFLECT) 
+				 newPoint[i]= 2.0*(top_right[i]-buffer) - newPoint[i];
+			// else --- is open
+		}
+	} // for dim
+} // check_boundaries()
 
 template<int dim>
 void 
@@ -1181,23 +1189,23 @@ else
 template<int dim>
 bool Geometry<dim>::isInDomain(const Point<dim>& location) const
 {
-// should have that point is in box, but still check:
-for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
- if(location[dim_itr] < bottom_left[dim_itr] || location[dim_itr] > top_right[dim_itr])
-   return false;
+	// should have that point is in box, but still check:
+	for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
+	 if(location[dim_itr] < bottom_left[dim_itr] || location[dim_itr] > top_right[dim_itr])
+	   return false;
 
-// check obstacles...
-unsigned int number_spheres = spheres.size();
-for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
- if(isInSphere(sphere_id, location))
-   return false;
+	// check obstacles...
+	unsigned int number_spheres = spheres.size();
+	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
+	 if(isInSphere(sphere_id, location))
+	   return false;
 
-unsigned int number_rectangles = rectangles.size();
-for(unsigned int rect = 0; rect < number_rectangles; ++rect)
- if(rectangles[rect].distance_from_border(location) < 1e-8)
-   return false;
+	unsigned int number_rectangles = rectangles.size();
+	for(unsigned int rect = 0; rect < number_rectangles; ++rect)
+	 if(rectangles[rect].distance_from_border(location) < 1e-8)
+	   return false;
 
-return true;
+	return true;
 }
 
 
@@ -1241,63 +1249,63 @@ for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
 template<int dim>
 std::vector<Point<dim> > Geometry<dim>::getQuerryPoints(double resolution) const
 {
-if(dim != 2)
- throw std::invalid_argument("getQuerryPoints() not implemented for dim != 2");
-const unsigned int number_spheres = spheres.size();
+	if(dim != 2)
+		throw std::invalid_argument("getQuerryPoints() not implemented for dim != 2");
+	
+	const unsigned int number_spheres = spheres.size();
 
-// if(number_spheres > 0 && dim != 2)
-//   throw std::invalid_argument("getQuerryPoints() not implemented for spheres in 3d");
+	// if(number_spheres > 0 && dim != 2)
+	//   throw std::invalid_argument("getQuerryPoints() not implemented for spheres in 3d");
 
-const unsigned int circlePoints = 32; // can maybe pass this in too
+	const unsigned int circlePoints = 32; // can maybe pass this in too
 
-unsigned int gridPoints = 1;
-for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
- gridPoints *= ceil( (this->getWidth(dim_itr))/resolution );
+	unsigned int gridPoints = 1;
+	for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
+		gridPoints *= ceil( (this->getWidth(dim_itr))/resolution );
 
-std::vector<Point<dim> > querry_points;
-querry_points.reserve(gridPoints + circlePoints*number_spheres);
+	std::vector<Point<dim> > querry_points;
+	querry_points.reserve(gridPoints + circlePoints*number_spheres);
 
-for(unsigned int i = 0; i < spheres.size(); i++)
-{
- const double radius = spheres[i].getRadius();
- const Point<dim> center = spheres[i].getCenter();
+	for(unsigned int i = 0; i < spheres.size(); i++)
+	{
+		const double radius = spheres[i].getRadius();
+		const Point<dim> center = spheres[i].getCenter();
 
- double theta = 0; 
- for(unsigned int j = 0; j < circlePoints; j++)
- {
-   const double x = radius*std::cos(theta) + center[0]; 
-   // @todo *** may need to add eps to be in domain
-   const double y = radius*std::sin(theta) + center[1];
+		double theta = 0; 
+		for(unsigned int j = 0; j < circlePoints; j++)
+		{
+			const double x = radius*std::cos(theta) + center[0]; 
+			// @todo *** may need to add eps to be in domain
+			const double y = radius*std::sin(theta) + center[1];
 
-   const Point<2> p(x,y);
-   if( this->isInDomain(p) )
-   {
-     querry_points.push_back(p);
-   } // if point in domain
+			const Point<2> p(x,y);
+			if( this->isInDomain(p) )
+			{
+				querry_points.push_back(p);
+			} // if point in domain
 
-   theta += dealii::numbers::PI/16.0;
- } // for circle points @todo : can add more points if querrying 3d spheres
-} // for spheres
+			theta += dealii::numbers::PI/16.0;
+		} // for circle points @todo : can add more points if querrying 3d spheres
+	} // for spheres
 
 
-Point<dim> p = bottom_left;
-for(unsigned int i=0; i<gridPoints; i++)
-{
- if( this->isInDomain(p) )
-   querry_points.push_back(p);
+	Point<dim> p = bottom_left;
+	for(unsigned int i=0; i<gridPoints; i++)
+	{
+		if( this->isInDomain(p) )
+			querry_points.push_back(p);
 
- // update p:
- p[0] += resolution;
+		// update p:
+		p[0] += resolution;
 
- if(p[0] > top_right[0])
- {
-   p[0] = bottom_left[0];
-   p[1] += resolution;
- }
-}
+		if(p[0] > top_right[0])
+		{
+			p[0] = bottom_left[0];
+			p[1] += resolution;
+		}
+	} 
 
-return querry_points;
-
+	return querry_points;
 } // getQuerryPoints()
 
 
@@ -1305,9 +1313,9 @@ template<int dim>
 void Geometry<dim>::printInfo(std::ostream& out) const
 {
 
-out << "\n\n-----------------------------------------------------" << std::endl;
+out << std::endl << std::endl << Utility::medium_line << std::endl;
 out << "\t\tGEOMETRY INFO:";
-out << "\n-----------------------------------------------------" << std::endl;
+out << std::endl << Utility::medium_line << std::endl;
 
 out << "DIMENSION: " << dim << std::endl
  << "\t BottomLeft: " << bottom_left << std::endl
@@ -1336,7 +1344,8 @@ out << "\nMESH TYPE: " << getMeshTypeString(mesh_type) << std::endl;
 if(mesh_type == MeshType::FILE_MESH)
  out << "\t Mesh File: " << mesh_file << std::endl;
 
-out << "\n-----------------------------------------------------\n\n" << std::endl;
+	out << Utility::medium_line << std::endl
+		<< std::endl << std::endl;
 }
 
 

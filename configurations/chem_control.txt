@@ -4,7 +4,7 @@
 set Simulator type = Bacteria
 set Time step = 0.001 // :0.1:1   // looped
 // option for bacteria time step??
-set Run time = 5.0
+set Run time = 15.0
 set Save period = 0.1
 // set Output directory = test // given from command line
 
@@ -21,8 +21,8 @@ end
 subsection Geometry
 	set Geometry type = Box 	// Box, File, or special type (see below)
 	//set Geometry file = file.txt // file path relative to local directory
-	set Bottom left = {0,0}
-	set Top right = {10,10} // may be updated for filter or other ...
+	set Bottom left = {-20,-20}
+	set Top right = {20,20} // may be updated for filter or other ...
 	set Boundary conditions = {WRAP, WRAP} 	// is overridden for special geometries or stokes flow
 	// special geometry types: "Filter, Mixer, Splitter, File"
 		//also should maybe give error if subsection of special geometry not given... 
@@ -32,7 +32,7 @@ end // can also include obstacles ... need geometry file...
 subsection Mesh
 	set Mesh type = Box 	// should this be an option or just given by geometry???
 	set Global refinement = 6
-	set Obstacle refinement = 1
+	set Obstacle refinement = 0
 	set Boundary refinement = 0
 	//set Mesh file = file_name
 end
@@ -50,21 +50,21 @@ end
 subsection Controls
 	set Type = {Square pulse, Square pulse} 
 	subsection Square pulse
-		set On period = {0.2, 0.1}
-		set Height = {100, 0.0}
-		set Off period = {0.4,0.2}
-		set Delay = {0.2, 0.3}
+		set On period = {0.3, 0.1}
+		set Height = {0.5, 0.15}
+		set Off period = {0.2,0.4}
+		set Delay = {0.0, 0.3}
 	end
 end
 
 subsection Bacteria
 	set Number bacteria = 100
 	set Number groups = 1
-	set Initial locations = {{5,5}} 
+	set Initial locations = {{0,0}} 
 	// {{5,5}} // should match dimension and number of groups // ***still giving bad parsing if on same line
 	set Diffusion = 0.1
 	set Secretion rate = {100,100}
-	set Mutation rate = 0.00000
+	set Mutation rate = 0.000003
 	set Mutation strength = 100; // uniform dist...
 	set Initial number cheaters = 0
 	set Deterministic number mutate = 0
@@ -76,7 +76,7 @@ end
 
 subsection Fitness
 	set Fitness type = OR
-	set Chemical fitness = {0,0}
-	set Secretion cost = 0
+	set Chemical fitness = {75,-80}
+	set Secretion cost = 0.2
 	set Chemical saturation = {0.01,0.1}
 end

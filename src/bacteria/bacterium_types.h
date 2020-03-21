@@ -33,7 +33,8 @@ public:
 	virtual void randomStep(double time_step, 
 						double diffusion_constant,
 						const Geometry<dim>& geo,
-						const Velocity::AdvectionHandler<dim>& velocity); 
+						const Velocity::AdvectionHandler<dim>& velocity,
+						double buffer=0); 
 
 	virtual double getFitness(const FitnessBase<dim>& fitness_function) const;
 		// need new fitness base class -- only dim as templated
@@ -83,12 +84,17 @@ BacteriumBase<dim>::BacteriumBase(const Point<dim>& p,
 	secretion_rates(rates)
 {}
 
+/** \brief random walk step */
+/** buffer set to 0 as default. Non-zero buffer corresponds to an extra
+*	reflection length against solid boundaries 
+*/
 template<int dim>
 void 
 BacteriumBase<dim>::randomStep(double time_step, 
 						double diffusion_constant,
 						const Geometry<dim>& geometry,
-						const Velocity::AdvectionHandler<dim>& velocity)
+						const Velocity::AdvectionHandler<dim>& velocity,
+						double buffer)
 {
 	Point<dim> old_location(location);
 
@@ -102,7 +108,7 @@ BacteriumBase<dim>::randomStep(double time_step,
 	location += std::sqrt(2*dim*time_step*diffusion_constant)*randomPoint
 	    + time_step*velocity.value(location);
 
-	geometry.checkBoundaries(old_location, location); 
+	geometry.checkBoundaries(old_location, location, buffer); 
 }
 
 template<int dim>

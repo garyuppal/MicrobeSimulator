@@ -4,14 +4,14 @@
 set Simulator type = Bacteria
 set Time step = 0.001 // :0.1:1   // looped
 // option for bacteria time step??
-set Run time = 10.0
+set Run time = 20.0
 set Save period = 0.1
 // set Output directory = test // given from command line
 
 subsection Advection
-	set Velocity type = No Flow // Square pipe
+	set Velocity type = Couette // Square pipe
 	// options: no flow, stokes, constant, couette, square pipe, vortex
-	set Maximum velocity = 0     			// doesn't matter if flow is off
+	set Maximum velocity = 10:10:100
 	set Vortex radius = 0        			// also doesn't matter here
 	set Vortex circulation = 0
 	set Stokes refinement = 0
@@ -21,8 +21,8 @@ end
 subsection Geometry
 	set Geometry type = Box 	// Box, File, or special type (see below)
 	//set Geometry file = file.txt // file path relative to local directory
-	set Bottom left = {0,0}
-	set Top right = {40,20} // may be updated for filter or other ...
+	set Bottom left = {0,-20}
+	set Top right = {50,20} // may be updated for filter or other ...
 	set Boundary conditions = {WRAP, REFLECT} 	// is overridden for special geometries or stokes flow
 	// special geometry types: "Filter, Mixer, Splitter, File"
 		//also should maybe give error if subsection of special geometry not given... 
@@ -31,9 +31,9 @@ end // can also include obstacles ... need geometry file...
 
 subsection Mesh
 	set Mesh type = Box 	// should this be an option or just given by geometry???
-	set Global refinement = 5
-	set Obstacle refinement = 1
-	set Boundary refinement = 1
+	set Global refinement = 6
+	set Obstacle refinement = 0
+	set Boundary refinement = 0
 	//set Mesh file = file_name
 end
 
@@ -52,13 +52,13 @@ subsection Controls
 end
 
 subsection Bacteria
-	set Number bacteria = 100
-	set Number groups = 1
-	set Initial locations = {{5,5}} 
+	set Number bacteria = 1000
+	set Number groups = 10
+	// set Initial locations = {{}} 
 	// {{5,5}} // should match dimension and number of groups // ***still giving bad parsing if on same line
-	set Diffusion = 0.1
+	set Diffusion = 1.0
 	set Secretion rate = {100,100}
-	set Mutation rate = 0.000002
+	set Mutation rate = 0.0000015
 	set Mutation strength = 100; // uniform dist...
 	set Initial number cheaters = 0
 	set Deterministic number mutate = 0

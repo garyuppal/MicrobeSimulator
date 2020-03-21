@@ -13,6 +13,8 @@
 
 namespace MicrobeSimulator{ namespace BacteriaNew{
 
+/** \brief Bacteria handler class
+*/
 template<int dim>
 class BacteriaHandler{
 public:
@@ -22,12 +24,18 @@ public:
 
 	void init(const ParameterHandler& prm, const Geometry<dim>& geo);
 
+	void reintro(const ParameterHandler& prm, const Geometry<dim>& geo);
+
 	// temporary initialization for testing:
 	void init_reg(double db, unsigned int n_bact, double pg_rate, double waste_rate);
 
 	// MODIFIERS:
 	void randomWalk(double dt, const Geometry<dim>& geometry,
-			const Velocity::AdvectionHandler<dim>& velocity);
+			const Velocity::AdvectionHandler<dim>& velocity, double buffer=0);
+	void randomWalk(double dt, const Geometry<dim>& geometry,
+			const Velocity::AdvectionHandler<dim>& velocity,
+			std::vector<double>& pg_rates, double buffer=0);
+
 	void reproduce(double dt, const FitnessBase<dim>& fitness_function); // need to change this
 	// void mutate(double dt); // general mutation method ... 
 
@@ -54,6 +62,10 @@ private:
 	double diffusion_constant;
 
 	void remove_fallen_bacteria(double right_edge);
+	void remove_and_capture_fallen_bacteria(
+		double right_edge, std::vector<double>& pg_rates);
+
+	void add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo);
 };
 
 // IMPL
@@ -70,6 +82,7 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 		prm.declare_entry("Number bacteria","100",Patterns::Unsigned());
 		prm.declare_entry("Number groups","1",Patterns::Unsigned());
 		prm.declare_entry("Diffusion","0.1",Patterns::Double());
+		prm.declare_entry("Edge buffer","0",Patterns::Double());
 		prm.declare_entry("Secretion rate",
 							"{100,100}",
 							Patterns::List(Patterns::Double()));
@@ -92,12 +105,28 @@ template<int dim>
 void 
 BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo)
 {
-	const std::string section = "Bacteria";
-	// using just regular bacteria for now: ( setup with bacterium base)
-	diffusion_constant = prm.get_double(section,"Diffusion");
-	const unsigned int n_bact = prm.get_unsigned(section, "Number bacteria");
+	const unsigned int n_bact = prm.get_unsigned("Bacteria", "Number bacteria");
 	bacteria.clear();
 	bacteria.reserve(n_bact);
+
+	add_bacteria(prm,geo);
+} 
+
+template<int dim>
+void
+BacteriaHandler<dim>::reintro(const ParameterHandler& prm, const Geometry<dim>& geo)
+{
+	add_bacteria(prm,geo);
+}
+
+template<int dim>
+void
+BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo)
+{
+	const std::string section = "Bacteria";
+
+	diffusion_constant = prm.get_double(section,"Diffusion");
+	const unsigned int n_bact = prm.get_unsigned(section, "Number bacteria");
 
 	std::vector<double> rates = prm.get_double_vector(section, "Secretion rate");
 	unsigned int number_groups = prm.get_unsigned(section, "Number groups");
@@ -118,8 +147,8 @@ BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo
 		Point<dim> location = initial_locations[group_index];
 
 		bacteria.emplace_back(new BacteriumBase<dim>(location, rates));
-	}
-} 
+	}	
+}
 
 template<int dim>
 void
@@ -142,17 +171,36 @@ BacteriaHandler<dim>::init_reg(double db,
 template<int dim>
 void 
 BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
-			const Velocity::AdvectionHandler<dim>& velocity)
+			const Velocity::AdvectionHandler<dim>& velocity,
+			double buffer)
 {
 	// std::cout << "doing random walk" << std::endl;
 	for(unsigned int i = 0; i < bacteria.size(); ++i)
-		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity);
+		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity, buffer);
 
 	// if boundary is open, remove fallen bacteria:
 	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
 		remove_fallen_bacteria(geometry.getTopRightPoint()[0]);	
 }
 
+template<int dim>
+void 
+BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
+		const Velocity::AdvectionHandler<dim>& velocity,
+		std::vector<double>& pg_rates,
+		double buffer)
+{
+	// std::cout << "doing random walk" << std::endl;
+	for(unsigned int i = 0; i < bacteria.size(); ++i)
+		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity, buffer);
+
+	// if boundary is open, remove fallen bacteria:
+	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
+		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0],
+											pg_rates);	
+}
+
+/** \brief Remove bacteria that move past right boundary*/
 template<int dim>
 void 
 BacteriaHandler<dim>::remove_fallen_bacteria(double right_edge)
@@ -166,6 +214,28 @@ BacteriaHandler<dim>::remove_fallen_bacteria(double right_edge)
 			++it;
 	} // for all bacteria
 } // remove_fallen_bacteria()
+
+/** \brief Remove and record public good secretion rates of fallen bacteria */
+template<int dim>
+void 
+BacteriaHandler<dim>::remove_and_capture_fallen_bacteria(
+	double right_edge, std::vector<double>& pg_rates)
+{
+	const double tolerance = 1e-4;
+	for(auto it = bacteria.begin(); it != bacteria.end(); )
+	{
+		if( (*it)->getLocation()[0] > (right_edge - tolerance) ) 
+		{
+			pg_rates.emplace_back((*it)->getSecretionRate(0)); 
+				/** @todo generalize to multiple public goods */
+			it = bacteria.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	} // for all bacteria
+} // remove_and_capture_fallen_bacteria()
 
 // simple implementaiton to get working, speed up later:
 // *** instead of recloning, and for future improvement,
@@ -329,18 +399,19 @@ template<int dim>
 void 
 BacteriaHandler<dim>::printInfo(std::ostream& out) const
 {
-	out << "\n\n-----------------------------------------------------" << std::endl
-		<< "\t\t BACTERIA INFO:"
-		<< "\n-----------------------------------------------------" << std::endl;
-
-	out << "\t Diffusion constant: " << diffusion_constant << std::endl
+	out << "\n\n" << Utility::medium_line << std::endl 
+		<< "\t\t BACTERIA INFO:" << std::endl
+		<< Utility::medium_line << std::endl
+		<< "\t Diffusion constant: " << diffusion_constant << std::endl
 		<< "\t Number bacteria: " << bacteria.size() << std::endl
-		<< "\t First Bacterium: " << bacteria[0]->getLocation() << std::endl;
-	out << "\t First secretion rates:" << std::endl;
+		<< "\t First Bacterium: " << bacteria[0]->getLocation() << std::endl
+		<< "\t First secretion rates:";
+
 	std::vector<double> srates = bacteria[0]->getSecretionRates();
 	for(unsigned int i = 0; i < srates.size(); ++i)
 		out << srates[i] << " ";
-	out << "\n-----------------------------------------------------" << std::endl;
+	out << std::endl << Utility::medium_line << std::endl
+		<< std::endl << std::endl;
 
 }
 

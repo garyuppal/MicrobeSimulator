@@ -645,16 +645,15 @@ template<int dim>
 void 	
 FE_Chemical<dim>::printInfo(std::ostream& out) const
 {
-	out << "\n\n-----------------------------------------------------" << std::endl
-		<< "\t\t FE CHEMICAL INFO:"
-		<< "\n-----------------------------------------------------" << std::endl;
-
-   	out << "Diffusion constant: " << diffusion_constant << std::endl
+	out << "\n\n" << Utility::medium_line << std::endl
+		<< "\t\t FE CHEMICAL INFO:" << std::endl
+		<< Utility::medium_line << std::endl
+   		<< "Diffusion constant: " << diffusion_constant << std::endl
    		<< "Decay constant: " << decay_constant << std::endl
    		<< "Viscosity beta: " << viscosity_beta << std::endl
    		<< "Time step: " << time_step << std::endl;
-
-	out << "\n-----------------------------------------------------\n\n" << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
 }
 
 }} // close namespace

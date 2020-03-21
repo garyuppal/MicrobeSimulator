@@ -133,10 +133,13 @@ namespace MicrobeSimulator{
       const bool from_above = (new_point[dim_itr] < (top_right[dim_itr] + edge_tolerance) ) &&
                               (old_point[dim_itr] > (top_right[dim_itr] + edge_tolerance) );
 
-      if(from_below)
+      if(from_below) // including from left
       { 
         // delta should already be positive, but in case not, use fabs:
-        const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr]) + 0.5*buffer;
+        double use_buffer = buffer;
+        if(dim_itr == 0)
+          use_buffer = 0; // dont add buffer to left (x = dim 0)
+        const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr]) + 0.5*use_buffer;
         new_point[dim_itr] = new_point[dim_itr] - 2.*delta;
       }
       else if(from_above)

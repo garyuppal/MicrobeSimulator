@@ -112,15 +112,15 @@ void CommandLineParameters::create_output_directory()
 
 void CommandLineParameters::print(std::ostream& out) const
 {
-	out << "\n----------------------------------------------------" << std::endl
+	out << std::endl << Utility::medium_line << std::endl
 		<< "\t COMMAND LINE ARGUMENTS" << std::endl
-		<< "----------------------------------------------------" << std::endl
+		<< Utility::medium_line << std::endl
 		<< "Parameter File: " << parameter_file << std::endl
 		<< "Job ID: " << job_ID << std::endl
 		<< "Dimension: " << dimension << std::endl
 		<< "Output Directory: " << output_directory << std::endl
-		<< "----------------------------------------------------" << std::endl
-		<< std::endl;
+		<< Utility::medium_line << std::endl
+		<< std::endl << std::endl;
 }
 
 } // CLOSE NAMESPACE

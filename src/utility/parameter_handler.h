@@ -36,6 +36,7 @@ namespace MicrobeSimulator{
 // 	Looping parameter data
 // ------------------------------------------------------------------------------
 
+/** \brief Class to handle looped parameter parsing */
 class MultiParameterData{
 public:
 	MultiParameterData(const std::string& psec,
@@ -57,9 +58,16 @@ private:
 
 	// values ( valid only for doubles at the moment)
 	std::string parameter_list;
+
+	std::vector<std::string> fixed_parameter_list;
+	/** @todo std::string pattern; // ideally we'd just supply the pattern
+	* also deal with looping over selection type parameters */
 	unsigned int number_parameters;
+
+	std::vector<std::string> set_fixed_parameter_list() const;
 };
 
+/** \brief Constuctor */
 MultiParameterData::MultiParameterData(const std::string& psec,
 						const std::string& pname,
 						const std::string& para_list)
@@ -68,10 +76,16 @@ MultiParameterData::MultiParameterData(const std::string& psec,
 	parameter_name(pname),
 	parameter_list(para_list)
 {
+	fixed_parameter_list = set_fixed_parameter_list();
 	number_parameters = get_parameter_list().size(); // to assign number parameters
 }
 
 
+/** \brief Get ith parameter in loop*/
+/** Called by parameter handler to assign specific parameter.
+* In case of list type parameters, this returns a list type string.
+* The parameter handler class then can manipulate the list string as needed
+*/
 std::string MultiParameterData::get_parameter(unsigned int i) const
 {
 	return get_parameter_list()[i];
@@ -79,26 +93,110 @@ std::string MultiParameterData::get_parameter(unsigned int i) const
 
 std::vector<std::string> MultiParameterData::get_parameter_list() const
 {
+	return fixed_parameter_list;
+}
+
+
+/** \brief Get looped list of parameters */
+/** This is the main method to find full list of looped parameter.
+* For a list of looped parameters, each looped list element is treated 
+* separately. If only a subset of list elements are looped, the other
+* is treated as a looping parameter of size 1. 
+* Also need this method to provide the correct number of parameters.
+* That's simply done by taking the size of the output list. For a 
+* multiply-looped list, the output is a list of total size given
+* the product of sizes of each sub-looped parameter.
+*/
+std::vector<std::string> MultiParameterData::set_fixed_parameter_list() const
+{
 	// for doubles for now; in general will depend on pattern
 	std::vector<std::string> result, tokens;
 
-	boost::split(tokens, parameter_list, boost::is_any_of(":"), boost::token_compress_on);
+	// first check if list (should be able to pass this info from patterns)
+	unsigned int n_commas = std::count(parameter_list.begin(), parameter_list.end(), ',');
+
+	// std::cout << "there are " << n_commas << " commas in \n\t<" << parameter_list
+	// 	<< ">" << std::endl;
+
+	if(n_commas == 0)
+	{
+		boost::split(tokens, parameter_list, boost::is_any_of(":"), boost::token_compress_on);
+ 
+ 		// assertion still holds here, since n_commas == 0
+		assert(tokens.size() == 3); /** @todo instead, count number of :'s, create lists as needed!
+										* may need to add a list property to this class */
+		const double start = std::stod(tokens[0]);
+		const double step = std::stod(tokens[1]);
+		const double stop = std::stod(tokens[2]);
+
+		for(double value = start; value <= stop; value += step)
+			result.emplace_back(std::to_string(value));
+	}
+	else if(n_commas == 1)
+	{
+		// process each subset of list:, assuming each part is looped:
+		// first parameter:
+		// from first { to ,:
+		unsigned int first = parameter_list.find_first_of("{");
+		unsigned int middle = parameter_list.find_first_of(",");
+		unsigned int last = parameter_list.find_first_of("}");
+		std::string first_parameter_list = parameter_list.substr(first+1,middle-first-1);
+		boost::trim(first_parameter_list);
+
+		/** Recursively find parameter list.
+		* @todo Need to account for case with only a subset looped, not all
+		*/
+		MultiParameterData fplist = MultiParameterData(section, parameter_name, first_parameter_list);
+		std::vector<std::string> firstList = fplist.get_parameter_list();
+		unsigned int n_first = fplist.get_number_parameters();
+		// std::cout << "there are " << n_first << " first parameters" << std::endl;
+		// second parameter:
+		std::string second_parameter_list = parameter_list.substr(middle+1,last-middle-1);
+		boost::trim(second_parameter_list);
+
+		MultiParameterData splist = MultiParameterData(section, parameter_name, second_parameter_list);
+		std::vector<std::string> secondList = splist.get_parameter_list();
+		unsigned int n_second = splist.get_number_parameters();
+		// std::cout << "there are " << n_second << " second parameters" << std::endl;
+
+		// make all tuples and append to result:
+		result.reserve(n_first*n_second);
+
+		for(unsigned int i = 0; i < n_first; ++i)
+			for(unsigned int j = 0; j < n_second; ++j)
+			{
+				std::string currentParameter = "{" 
+									+ firstList[i]
+									+ ","
+									+ secondList[j]
+									+ "}";
+				result.emplace_back(currentParameter);
+			}
+
+		// for(unsigned int i = 0; i < result.size(); ++i)
+		// 	std::cout << "\t<" << result[i] << ">" << std::endl;
+		// std::cout << "------------------------------------------\n\n\n" << std::endl;
+	}
+	else
+	{
+		std::cout << "Multi parameter looping for lists greater than two parameters"
+			" not yet impemented" << std::endl;
+		assert(false);
+	}
+
+	return result; // a tuple type if input is as such (1){a,b,c} (2){d,e,f} ...
+}
+
+
+	/* parameter list is whole list from { to } with list seperated by , 's
+	* ... want to store each , separated thing separately, and reassign as a list...
+	*/
 
 	// std::cout << "Tokens for " << section + "." + parameter_name << ": " << std::endl;
 	// for(unsigned int i = 0; i < tokens.size(); ++i)
 	// 	std::cout << "<" << tokens[i] << ">" << std::endl;
 	// std::cout << "............." << std::endl << std::endl;
 
-	assert(tokens.size() == 3);
-	const double start = std::stod(tokens[0]);
-	const double step = std::stod(tokens[1]);
-	const double stop = std::stod(tokens[2]);
-
-	for(double value = start; value <= stop; value += step)
-		result.emplace_back(std::to_string(value));
-
-	return result;
-}
 
 unsigned int MultiParameterData::get_number_parameters() const
 {
@@ -121,10 +219,26 @@ std::unique_ptr<MultiParameterData> MultiParameterData::clone() const
 		MultiParameterData(section,parameter_name,parameter_list));
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ------------------------------------------------------------------------------
 // 	PARAMETER HANDLER
 // ------------------------------------------------------------------------------
 
+
+/** \brief Parameter handling class */
 class ParameterHandler{
 public:
 	ParameterHandler(const std::string& pfile, unsigned int jid = 0);
@@ -172,6 +286,7 @@ public:
 
 	// OUTPUT:
 	void print(std::ostream& out) const;
+	void print_simple(std::ostream& out) const;
 	void printLoopedParameterGrid(std::ostream& out) const;
 	// std::ostream& print_parameters(std::ostream& out, const OutputStyle style) const;
 
@@ -441,18 +556,18 @@ std::vector<unsigned int> ParameterHandler::get_local_job_indices(unsigned int j
 void ParameterHandler::printLoopedParameterGrid(std::ostream& out) const
 {
 	out << std::endl << std::endl
-		<< "----------------------------------------------------------------"
+		<< Utility::medium_line
 		<< std::endl
 		<< "\t\t PARAMETER GRID"
 		<< std::endl
-		<< "----------------------------------------------------------------"
+		<< Utility::medium_line
 		<< std::endl;
 	out << "Job ID";
 	for(unsigned int i = 0; i < looped_parameters.size(); ++i)
 	{
 		out << "\t" << looped_parameters[i]->get_name();
 	}
-	out << "\t THIS" << std::endl;
+	out << "\t\t THIS" << std::endl;
 
 	const unsigned int total_grid_size = get_grid_size();
 	for(unsigned int i = 1; i <= total_grid_size; ++i) // for all possible parameters
@@ -463,15 +578,15 @@ void ParameterHandler::printLoopedParameterGrid(std::ostream& out) const
 		{
 			out << "\t" << looped_parameters[j]->get_parameter(job_indices[j]);
 		}
-		if( i == job_ID )
+		if( ((job_ID-1)%total_grid_size) == (i-1) )
 		{
-			out << "\t X";
+			out << "\t\t X";
 		}
 		out << std::endl;
 	}
 
-	out << "----------------------------------------------------------------"
-		<< std::endl << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
 
 }
 
@@ -801,13 +916,27 @@ std::string indent(int level) {
 
 void ParameterHandler::print(std::ostream& out) const
 {
-	out << "parameters...\n\n\n" << std::endl;
+	out << "\n\n" << Utility::medium_line << std::endl 
+		<< "\t\t PARAMETERS:" << std::endl
+		<< Utility::medium_line << std::endl;
 
 	int level = 0;
 
 	print_recursive(out,*entries,level);
 }
 
+void ParameterHandler::print_simple(std::ostream& out) const
+{
+	out << "\n\n" << Utility::medium_line << std::endl 
+		<< "\t\t PARAMETERS:" << std::endl
+		<< Utility::medium_line << std::endl;
+
+	int level = 0;
+
+	print_recursive_simple(out,*entries,level);
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
+}
 
 void ParameterHandler::print_recursive(std::ostream& out, 
 	 const pt::ptree &tree, int level) const
@@ -842,57 +971,39 @@ void ParameterHandler::print_recursive(std::ostream& out,
 	return; 
 }
 
-// @ todo:
-///*** still need to get following function working
 void ParameterHandler::print_recursive_simple(std::ostream& out, 
 	 const pt::ptree &tree, int level) const
 {
-
-	if (tree.empty()) {
-		out << "\""<< tree.data()<< "\"";
+	if (tree.empty()) 
+	{
+		out << "\""<< tree.data()<< "\"" << std::endl;
 	}
-	else {
-		if(level)
-			 out << std::endl; 
-
-		// out << indent(level) << "{" << std::endl;     
+	else 
+	{
+		if(!(tree.begin()->second).empty())
+			out << std::endl;
+		else
+			out << "\t\t\t";
 
 		for (pt::ptree::const_iterator pos = tree.begin(); 
-				pos != tree.end(); ) {
-
-			// skip others:
-			if( boost::iequals(pos->first, "default_value") ||
-				boost::iequals(pos->first, "documentation") ||
-				boost::iequals(pos->first, "pattern") )
-			{
-				++pos;
-				// out << " "; // *** skip next level too
-			}
-			else if(boost::iequals(pos->first, "value"))
-			{
-				out << indent(level+1) << "\"" << pos->first << "\": "
-					<<  "\"" << (++pos)->first << "\""; 
-			}
-			else
-			{
-				out << indent(level+1) << "\"" << pos->first << "\": "; 
-			}
-
+				pos != tree.end(); ) 
+		{
+			out << indent(2*level+2) << pos->first << ": "; 
 			print_recursive_simple(out, pos->second, level + 1); 
-			++pos; 
 		
-			// if (pos != tree.end()) {
-			// 	out << ","; 
-			// }
-			
-			out << std::endl;
-		} 
+			// skip over non-value print-outs:
+			pt::ptree::const_iterator pos_value = pos;
+			++(++(++(++pos_value)));
+			if((pos->second).empty())
+				if (pos_value == tree.end()) 
+					break;
 
-		// out << indent(level) << " }";     
+			++pos; 
+		} 
 	}
 
 	return; 
-}
+} // print_recursive_simple()
 
 } // CLOSE NAMESPACE
 #endif

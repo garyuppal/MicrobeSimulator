@@ -14,7 +14,15 @@
 namespace MicrobeSimulator{ namespace Utility{
 	static constexpr double PI =  3.14159265358979323846; 
 	static constexpr double PI_2 = 1.57079632679489661923;
-	
+	static const std::string short_line = 
+		"-----------------------------------------------------";
+	static const std::string medium_line = 
+		"-----------------------------------------------------------------------------";
+	static const std::string long_line = 
+		"-----------------------------------------------------"
+				"-----------------------------------------------------";
+
+
 	struct LoopedParameter{
 		double start_value;
 		double step_size;

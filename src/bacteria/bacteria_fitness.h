@@ -4,8 +4,8 @@
 #include <deal.II/base/point.h>
 using dealii::Point;
 
-// #include "../chemicals/chemical_interface.h"
 #include "../chemicals/chemical_handler.h"
+#include "../utility/utility.h"
 
 #include <vector>
 #include <memory>
@@ -180,14 +180,16 @@ OR_Fitness<dim>::printInfo(std::ostream& out) const
 {
 	const unsigned int numchem = this->chemicals->getNumberChemicals();
 
-	out << "\n\n-----------------------------------------------------" << std::endl
+	out << "\n\n" << Utility::medium_line << std::endl
 	    << "\t\tOR FITNESS FUNCTION (for " << numchem << " chemicals)" << std::endl
-	    << "-----------------------------------------------------" << std::endl
+	    << Utility::medium_line << std::endl
 	    << "\t public good benefit: " << benefit_constant << std::endl
 	    << "\t waste harm: " << harm_constant << std::endl
 	    << "\t public good saturation: " << benefit_saturation << std::endl
 	    << "\t waste saturation: " << harm_saturation << std::endl
 	    << "\t secretion cost: " << secretion_cost << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
 }
 
 }} // CLOSE NAMESPACE

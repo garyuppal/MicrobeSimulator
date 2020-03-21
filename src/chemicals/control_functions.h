@@ -2,6 +2,7 @@
 #define MICROBESIMULATOR_CONTROL_FUNCTIONS_H
 
 #include <deal.II/base/function.h>
+#include "../utility/utility.h"
 #include "../utility/parameter_handler.h"
 
 namespace MicrobeSimulator{ namespace Chemicals{
@@ -86,16 +87,15 @@ template<int dim>
 void 
 SquarePulse<dim>::printInfo(std::ostream& out) const 
 {
-	out << "\n\n-----------------------------------------------------" << std::endl
-		<< "\t\t SQUARE PULSE FUNCTION:"
-		<< "\n-----------------------------------------------------" << std::endl;
-
-   	out << "Height: " << amplitude << std::endl
+	out << "\n\n" << Utility::medium_line << std::endl
+		<< "\t\t SQUARE PULSE FUNCTION:" << std::endl
+		<<  Utility::medium_line << std::endl
+   	  	<< "Height: " << amplitude << std::endl
    		<< "On period: " << on_period << std::endl
    		<< "Off period: " << off_period << std::endl
-   		<< "Delay: " << delay << std::endl;
-
-	out << "\n-----------------------------------------------------\n\n" << std::endl;
+   		<< "Delay: " << delay << std::endl
+		<< std::endl << Utility::medium_line 
+		<< std::endl << std::endl << std::endl;
 }
 
 // ---------------------------------------------------------------------
@@ -128,6 +128,12 @@ SquarePulse<dim>::printInfo(std::ostream& out) const
 // CONTROL FUNCTION HANDLER CLASS:
 // --------------------------------------------------------------------------------------------
 
+/** \brief Class to handle control functions for chemical fields
+*/
+/**
+* 
+* @todo Implement more than just the square pulse maybe
+*/
 template<int dim>
 class Controls{
 public:
@@ -142,21 +148,30 @@ public:
 
 	void update_time(double dt);
 
-	void printInfo(std::ostream& out);
+	bool isActive() const;
+
+	void printInfo(std::ostream& out) const;
 
 private:
+	bool active;
 	std::vector<std::string> 							control_types;
 	std::vector<std::shared_ptr<TimedFunction<dim> > > 	control_functions; 
 };
 
 // ---------------------------------------------------------------------------------------------
+/** \brief Constructor
+*/
 template<int dim>
 Controls<dim>::Controls()
+	:
+	active(false)
 {}
 
+/** \brief Sets up parameters to be read in for Controls class
+*/
 template<int dim>
 void
-Controls<dim>::declare_parameters(ParameterHandler& prm)
+Controls<dim>::declare_parameters(ParameterHandler& prm) 
 {
 	prm.enter_subsection("Controls");
 		prm.declare_entry("Type","{None,None}",
@@ -170,6 +185,8 @@ Controls<dim>::declare_parameters(ParameterHandler& prm)
 	prm.leave_subsection();
 }
 
+/** \brief Returns string reference to control function type for ith control
+*/
 template<int dim>
 const std::string& 
 Controls<dim>::getControlType(unsigned int i) const
@@ -177,6 +194,8 @@ Controls<dim>::getControlType(unsigned int i) const
 	return control_types[i];
 }
 
+/** \brief Read only access operator for a "TimedFunction<dim>" 
+*/
 template<int dim>
 const TimedFunction<dim>& 
 Controls<dim>::operator[](unsigned int i) const
@@ -184,14 +203,17 @@ Controls<dim>::operator[](unsigned int i) const
 	return *(control_functions[i]);
 }
 
+/** \brief Sets up control functions from parameters
+*/
 template<int dim>
 void
 Controls<dim>::setup(const ParameterHandler& prm)
 {
 	// get total possible number from number of chemicals	
-	const unsigned int numchem = prm.get_unsigned("Chemicals", "Number chemicals");
+	// const unsigned int numchem = prm.get_unsigned("Chemicals", "Number chemicals");
 	const std::string section = "Controls";
 
+	/** currently up to user to make sure same number of controls as chemicals */
 	control_types = prm.get_list(section, "Type");
 
 	for(unsigned int i = 0; i < control_types.size(); ++i)
@@ -199,6 +221,8 @@ Controls<dim>::setup(const ParameterHandler& prm)
 		// assuming either both are None or both square***
 		if( boost::iequals(control_types[i], "Square pulse") )
 		{
+			active = true; /** @todo Instead of using active, maybe allow for None type
+							* or have array of bools ... */
 			std::cout << "Using square pulse control function for chemical " << i << std::endl;
 			const std::string subsection = section + ".Square pulse";
 			const double a = prm.get_double_vector(subsection, "Height")[i];
@@ -211,18 +235,34 @@ Controls<dim>::setup(const ParameterHandler& prm)
 	}
 }
 
+/** \brief Increments internal clock for control functions by time step dt
+*/
 template<int dim>
 void 
-Controls<dim>::update_time(double dt)
+Controls<dim>::update_time(double dt) 
 {
 	for(unsigned int i = 0; i < control_functions.size(); ++i)
 		control_functions[i]->update_time(dt);	
 }
 
+/** \brief Checks if control functions are other than "NONE"
+*/
+template<int dim>
+bool 
+Controls<dim>::isActive() const
+{
+	return active;
+}
+
+/** \brief Prints control function information to ostream taken as input
+*/
 template<int dim>
 void
-Controls<dim>::printInfo(std::ostream& out)
+Controls<dim>::printInfo(std::ostream& out) const
 {
+	/** Takes an ostream reference as input. For example, to print to console
+	* just call function with std::cout as the parameter.  
+	*/
 	for(unsigned int i = 0; i < control_functions.size(); ++i)
 		control_functions[i]->printInfo(out);
 }

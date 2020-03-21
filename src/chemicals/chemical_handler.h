@@ -64,6 +64,11 @@ public:
 
 	void output(std::string output_directory, 
 		unsigned int save_step_number) const; 
+
+	void output_grid(std::string output_directory, 
+		unsigned int save_step_number,
+		const Geometry<dim>& geo) const; 
+
 	void printInfo(std::ostream& out) const;
 private:
 	// shared pointer to base 
@@ -108,6 +113,7 @@ ChemicalHandler<dim>::declare_parameters(ParameterHandler& prm)
 							"{50,15}",
 							Patterns::List(Patterns::Double()));
 		prm.declare_entry("Save chemicals", "False",Patterns::Bool());
+		prm.declare_entry("Grid save","False",Patterns::Bool());
 		prm.declare_entry("Time step factor", "1", Patterns::Double());
 		prm.declare_entry("Viscosity beta","1",Patterns::Double());
 	prm.leave_subsection();
@@ -225,6 +231,33 @@ ChemicalHandler<dim>::output(std::string output_directory,
 		std::ofstream out(outfile);
 
 		chemicals[i]->print(out, i); 
+	}
+}
+
+template<int dim>
+void 
+ChemicalHandler<dim>::output_grid(std::string output_directory, 
+		unsigned int save_step_number,
+		const Geometry<dim>& geo) const
+{
+	for(unsigned int i = 0; i < chemicals.size(); ++i)
+	{
+		std::string outfile = output_directory
+							+ "/Chemical_"
+							+ dealii::Utilities::int_to_string(i, 2)
+							+ "_" 
+							+ dealii::Utilities::int_to_string(save_step_number,4)
+							+ ".dat"; // might want to change format dynamically ...
+		std::ofstream out(outfile);
+
+		// get points
+		std::vector<Point<dim> > querry_points = geo.getQuerryPoints(0.2); 
+		// get from geometry. using 0.2 resolution as default
+		std::vector<double> values = chemicals[i]->value_list(querry_points);
+
+		// print to file:
+		for(unsigned int q = 0; q < querry_points.size(); ++q)
+			out << querry_points[q] << " " << values[q] << std::endl;
 	}
 }
 
