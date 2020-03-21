@@ -48,15 +48,16 @@ def rescaleColor(sc, smax):
 
 
 def plotAndSnap(data, boundary, rect):
-    # print(data.shape)
-    x = data[:, 0]
-    y = data[:, 1]
-    # plt.figure()
-    srates = data[:, 2]
-    myColors = [[0, rescaleColor(sr, 100.0), 0] for sr in srates]
-    plt.scatter(x, y, s=10, c=myColors)
-    plt.xlim(boundary_data[0, 0], boundary_data[1, 0])
-    plt.ylim(boundary_data[0, 1], boundary_data[1, 1])
+    if data.size > 0:
+        x = data[:, 0]
+        y = data[:, 1]
+        # plt.figure()
+        srates = data[:, 2]
+        myColors = [[0, rescaleColor(sr, 100.0), 0] for sr in srates]
+        plt.scatter(x, y, s=10, c=myColors)
+        plt.xlim(boundary_data[0, 0], boundary_data[1, 0])
+        plt.ylim(boundary_data[0, 1], boundary_data[1, 1])
+     
     ax.set_aspect('equal')
     for i in range(0, rectangles.shape[0]):
         rect = patches.Rectangle((rectangles[i, 0], rectangles[i, 1]), width=(rectangles[i, 2]-rectangles[i, 0]),

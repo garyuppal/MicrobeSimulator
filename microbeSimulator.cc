@@ -13,6 +13,36 @@
 
 // *************************************************************************************
 // @ todo:
+
+// ** clean up geometry class
+
+// increase # of -'s in print outs, can even call line a constant from utility
+// short_line, long_line for example
+// print out if no controls used ("none" type)
+// print out velocity information
+
+// try adding buffer for microbes, to eliminate sticking, done --- left buffer turned off
+// also try simulation continuous version to check pattern types...
+
+// ** first establish proof of concept, try binary mutation with lower rates
+
+// ***bug in fitler trial run 8? also for run 37
+// also add check to make sure time step is suitable for microbes with given diffusion constant
+// and channel thickness, don't want them to go through...
+
+// add ability to save chemicals as grid with fixed resolution 0.2 X done
+
+// essential:
+// 1. implement looping within list parameters // X should be good
+// 2. have microbe reintroduction implemented if not done so already X
+	// - save fallen and allow reintro even if extinct				X // done
+
+// somewhere between 2 and 3, maybe less long channels (shoud be able to scale all with
+// time and mutaiton rate). need many runs and look at output...
+
+// eventually might be nice to be able to define variables in
+// configuration file, can then have some more flexibility with looping and such
+
 // *** can add a small slip velocity (can even make this a parameter)
 // - run base tests:
 	// initial group locations?
@@ -42,20 +72,19 @@ int main(int argc, char** argv)
 		using namespace std::chrono;
 		using namespace MicrobeSimulator;
 
-		/// start time (for timing)
+		// start time (for timing)
 		auto start = high_resolution_clock::now();
 
-		// parse command line:
+		// parse command line (also creates output directory):
 		CommandLineParameters cmd_prm(argc,argv);
-		// also creates output directory
-
 		cmd_prm.print(std::cout);
 
-		/// iniitialze random seed
-		// const unsigned int seed =  time(0) + cmd_prm.getJobID(); // + parameters.getJobID(); // 100; //
-		// std::cout << "Using Seed: " << seed << std::endl;
-		// srand(seed);
+		// iniitialze random seed
+		const unsigned int seed =  time(0) + cmd_prm.getJobID(); // + parameters.getJobID(); // 100; //
+		std::cout << "Using Seed: " << seed << std::endl;
+		srand(seed);
 
+		// run simulation:
 		if(cmd_prm.getDimension() == 2){
 			FullSimulator<2> sim(cmd_prm);
 			sim.run();
@@ -64,12 +93,8 @@ int main(int argc, char** argv)
 		// else if(cmd_prm.getDimension() == 3){
 		// 	FullSimulator<3> sim(cmd_prm);
 		// 	sim.run();
-/* ADD:
-* get querry points() geometry issue with 3d?
-*
-*/
 
-		/// end time, to get run time:
+		// end time, to get run time:
 		auto stop = high_resolution_clock::now();
 		auto duration = duration_cast<seconds>(stop - start);
 
