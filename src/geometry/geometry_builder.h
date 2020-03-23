@@ -788,9 +788,9 @@ private:
 	double radius;
 
 	// support methods:
-	void construct_mixer_center(Triangulation<dim>& tria);
-	void generate_half_circle_hole_tile(Triangulation<dim>& tile);
-	void add_mixer_ends(Triangulation<dim>& center, Triangulation<dim>& tria);
+	void construct_mixer_center(Triangulation<dim>& tria) const;
+	void generate_half_circle_hole_tile(Triangulation<dim>& tile) const;
+	void add_mixer_ends(Triangulation<dim>& center, Triangulation<dim>& tria) const;
 };
 
 // IMPL
@@ -827,45 +827,35 @@ Mixer<dim>::declare_parameters(ParameterHandler& prm)
 // override virtual methods:
 
 /** \brief Override build geometry for Mixer */
+/** @todo Add a depth parameter for possible 3D 
+*  @todo will also probably need to add cylinder type reflection in geometry class
+*/
 template<int dim>
 void 
 Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 {
+	if(height < 2.*radius)
+		throw std::invalid_argument("Mixer height must be greater than sphere diameter");
 
-// template<int dim>
-// void 
-// Geometry<dim>::create_mixer_geometry(double left_length,
-//                                double right_length,
-//                                double height,
-//                                double radius)
-// {
-// if(dim != 2)
-//  throw std::invalid_argument("Mixer only implemented for dim == 2");
+	const double width = left_length + 2.*radius + right_length;
 
-// std::cout << "\n\t CREATE MIXER GEOMETRY:" << std::endl
-//  << "left_length = " << left_length << std::endl
-//  << "right_length = " << right_length << std::endl
-//  << "height = " << height << std::endl
-//  << "radius = " << radius << std::endl; 
+	Point<dim> bottom_left, top_right;
 
-// if(height < 2.*radius)
-//  throw std::invalid_argument("Mixer height must be greater than sphere diameter");
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+		bottom_left[dim_itr] = 0;
 
-// const double width = left_length + 2.*radius + right_length;
+	top_right[0] = width;
+	top_right[1] = height;
 
-// for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
-//  bottom_left[dim_itr] = 0;
+	geo.setBottomLeftPoint(bottom_left);
+	geo.setTopRightPoint(top_right);
 
-// top_right[0] = width;
-// top_right[1] = height;
+	// add spheres:
+	/** @ todo would need to add cylinders for 3D case */
+	const double center_x = left_length + radius;
 
-// // add spheres:
-// const double center_x = left_length + radius;
-// spheres.push_back(Sphere<2>(Point<2>(center_x, 0.) ,radius));
-// spheres.push_back(Sphere<2>(Point<2>(center_x, height) ,radius));
-// }
-
-
+	geo.addSphere( Sphere<2>(Point<2>(center_x, 0.) ,radius) );
+	geo.addSphere( Sphere<2>(Point<2>(center_x, height) ,radius) );
 }
 
 /** \brief Override build grid for Mixer */
@@ -943,7 +933,7 @@ Mixer<dim>::printInfo(std::ostream& out) const
 /** \brief Constuct center portion of mixer mesh */
 template<int dim>
 void 
-Mixer<dim>::construct_mixer_center(Triangulation<dim>& center)
+Mixer<dim>::construct_mixer_center(Triangulation<dim>& center) const
 {
 	generate_half_circle_hole_tile(center); // generated with corner at origin
 
@@ -974,7 +964,7 @@ Mixer<dim>::construct_mixer_center(Triangulation<dim>& center)
 */
 template<int dim>
 void 
-Mixer<dim>::generate_half_circle_hole_tile(Triangulation<dim>& hole_tile)
+Mixer<dim>::generate_half_circle_hole_tile(Triangulation<dim>& hole_tile) const
 {
 	if(dim != 2)
 		throw std::runtime_error("Function not implemented for dim != 2");
@@ -1014,7 +1004,7 @@ Mixer<dim>::generate_half_circle_hole_tile(Triangulation<dim>& hole_tile)
 template<int dim>
 void 
 Mixer<dim>::add_mixer_ends(Triangulation<dim>& center,
-		                Triangulation<dim>& tria)
+		                Triangulation<dim>& tria) const
 {
 	// center tile will be a `buffer' length wider than radius
 	// we adjust left and right lengths accordingly to get desired lengths
