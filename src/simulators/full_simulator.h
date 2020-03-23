@@ -13,11 +13,12 @@ using dealii::Triangulation;
 #include "../chemicals/chemical_handler.h"
 #include "../advection/advection_handler.h"
 #include "../geometry/geometry.h"
+#include "../geometry/geometry_builder.h" // rename to tools ***
 
 // TOOLS:
 // #include "../utility/argparser.h"
-#include "./grid_generation_tools.h" // can include  a parameter declaration function here
-#include "./simulation_tools.h"
+#include "../geometry/grid_generation_tools.h" // can include  a parameter declaration function here
+// #include "./simulation_tools.h"
 
 #include "../utility/parameter_handler.h"
 #include "../utility/command_line_parser.h"
@@ -33,6 +34,20 @@ using dealii::Triangulation;
 
 
 namespace MicrobeSimulator{
+
+	namespace SimulationTools{
+		/** \brief Output vector to file */
+		void output_vector(const std::vector<double>& vec, 
+			const std::string& data_name,
+			const std::string& output_directory)
+		{
+			std::string outFile = output_directory + "/" + data_name + ".dat";
+			std::ofstream out(outFile);
+
+			for(unsigned int i = 0; i < vec.size(); ++i)	
+				out << vec[i] << std::endl;
+		}
+	} // close SimulationTools namespace
 
 /** \brief Simulator class
 * This class handles reading in parameters, constructing, and executing the simulation.
@@ -90,6 +105,7 @@ private:
 	void reintro_bacteria(); 
 
 	// setup:
+	void declare_parameters();
 	void setup_system(); // can even move this outside of this class,
 	void assign_local_parameters();
 	void setup_time_steps();
@@ -399,37 +415,34 @@ FullSimulator<dim>::setup_system()
 	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
 
 	std::cout << "...setting up parameters" << std::endl;
-	SimulationTools::declare_common_parameters(prm); // @ todo: maybe make a local function
-	Velocity::AdvectionHandler<dim>::declare_parameters(prm);
-	Geometry<dim>::declare_parameters(prm);
-	GridGenerationTools::declare_parameters(prm);
-	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
-	Chemicals::Controls<dim>::declare_parameters(prm);
-	BacteriaNew::BacteriaHandler<dim>::declare_parameters(prm);
-	BacteriaNew::Fitness::declare_parameters(prm);
 
+	declare_parameters(); 
 	prm.parse_parameter_file();
 	prm.print_simple(std::cout);
 	std::ofstream out(output_directory + "/parameters.dat");
 	prm.print(out);
-
 	prm.printLoopedParameterGrid(std::cout);
-
 	assign_local_parameters();
 
 	std::cout << "...setting up geometry" << std::endl;
-		geometry.init(prm);
+		
+		// *** LEFT OFF HERE // use geometry builder
+		GeometryTools::GeometryBuilder<dim> geo_bldr(prm);
+		geo_bldr.printInfo(std::cout);
+		geo_bldr.build_geometry(geometry);
+
 		geometry.printInfo(std::cout);
-		SimulationTools::output_geometry(output_directory, geometry);
+		geometry.outputGeometry(output_directory);
 
 	std::cout << "...setting up grid" << std::endl;
-		SimulationTools::setup_grid(prm, geometry, triangulation);
-		SimulationTools::output_grid(output_directory,"before_stokes_grid",triangulation);
+		geo_bldr.build_grid(geometry, triangulation);
+		// GridGenerationTools::setup_grid(prm, geometry, triangulation);
+		GridGenerationTools::output_grid(output_directory,"before_stokes_grid",triangulation);
 
 	std::cout << "...setting up velocity" << std::endl;
 		velocity_function.init(prm,geometry,triangulation,output_directory);
 
-	SimulationTools::output_grid(output_directory,"after_stokes_grid",triangulation);
+	GridGenerationTools::output_grid(output_directory,"after_stokes_grid",triangulation);
 
 	std::cout << "...setting up time steps" << std::endl;
 		setup_time_steps();
@@ -483,7 +496,7 @@ double
 FullSimulator<dim>::get_chemical_time_step()
 {
 	const double min_time_step = 0.001;
-	double maximal_velocity = velocity_function.get_maximum_velocity(0); // SimulationTools::getMaxVelocity(geometry, velocity_function);
+	double maximal_velocity = velocity_function.get_maximum_velocity(0); 
 	maximal_velocity = std::max(maximal_velocity, 0.1);
 
 	// const double maximal_velocity = std::max(velocity_function.get_maximal_velocity(), 0.1);
@@ -514,7 +527,32 @@ FullSimulator<dim>::setup_fitness()
 			prm.get_double_vector(section, "Chemical saturation"));
 }
 
+template<int dim>
+void 
+FullSimulator<dim>::declare_parameters()
+{
+	// *** set job id and dimension in command line
+	prm.declare_entry("Simulator type",
+						"Bacteria",
+						Patterns::Selection("Bacteria|IC_AS|Aging|Chemotaxis"),
+						"Simulator type.");
+	prm.declare_entry("Time step", "1", Patterns::Double());
+	prm.declare_entry("Run time","0",Patterns::Double());
+	prm.declare_entry("Save period","1",Patterns::Double());
+	prm.declare_entry("Output directory","./",Patterns::Anything());
+	// prm.declare_entry("Run cycles") // member of specific simulator ...
 
+	// declare class based parameters:
+	Velocity::AdvectionHandler<dim>::declare_parameters(prm);
+	GeometryTools::GeometryBuilder<dim>::declare_parameters(prm);
+	GridGenerationTools::declare_parameters(prm);
+	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
+	Chemicals::Controls<dim>::declare_parameters(prm);
+	BacteriaNew::BacteriaHandler<dim>::declare_parameters(prm);
+	BacteriaNew::Fitness::declare_parameters(prm);
+
+
+}
 
 } // close namespace
 #endif

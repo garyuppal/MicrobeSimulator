@@ -2,10 +2,17 @@
 #define GEOMETRY_H
 
 // TO DO:
-// have sphere implement its own reflection
 // clean up names and intialization
+// generalize setup and mesh setup ...
+// add circle boundary for vortex and cylinder... (also need to make mesh)
+
+ 
+// remove some enum types??
+
+// have sphere implement its own reflection X
+
 // do we need all the below headers??? -- remove uncessary ones
-// remove scale parameter
+// remove scale parameter X
 
 #include <iostream>
 #include <stdlib.h>
@@ -18,15 +25,115 @@
 #include "sphere.h"
 #include "hyper_rectangle.h"
 
-#include "../utility/enum_types.h" // clean up names and definitions...
+// #include "../utility/enum_types.h" // clean up names and definitions...
 #include "../utility/parameter_handler.h"
 
-// maybe remove this:
+// maybe remove this: // rename and use as support 
 #include "./geo_types.h" 
-
+// #include "./geometry_types.h" // don't need here, otherwise seems circular
 
 namespace MicrobeSimulator{
 
+	enum class BoundaryCondition : int
+	{
+		WRAP = 0, REFLECT = 1, OPEN = 2 // open end will be upper end for now
+	}; // only makes sense for hyper cube
+
+	std::string getBoundaryConditionString(BoundaryCondition bc)
+	{
+		std::string result = "";
+		if(bc == BoundaryCondition::WRAP)
+			result = "Periodic";
+		else if(bc == BoundaryCondition::REFLECT)
+			result = "Neumann";
+		else if(bc == BoundaryCondition::OPEN)
+			result = "Open";
+		else
+			result = "ERROR";
+
+		return result;
+	}
+
+
+	BoundaryCondition stringToBoundaryCondition(std::string value)
+	{
+		if( boost::iequals(value, "WRAP") )
+			return BoundaryCondition::WRAP;
+		else if( boost::iequals(value, "REFLECT") )
+			return BoundaryCondition::REFLECT;
+		else if( boost::iequals(value, "OPEN") )
+			return BoundaryCondition::OPEN;
+		else
+		{
+			std::string msg = "Invalid string! Could not convert <"
+							+ value
+							+ "> to boundary condition type.";
+			throw std::invalid_argument(msg.c_str());
+		}
+	}
+
+// MESH TYPE // REMOVE THIS:
+	enum class MeshType : int
+	{
+		FILE_MESH = 0, BOX_MESH = 1, SQUARE_CHEESE = 2, HEX_CHEESE = 3,
+		MIXER = 4, FILTER = 5, SPLITTER = 6
+	};
+
+	std::string getMeshTypeString(MeshType mesh_type)
+	{
+		std::string result = "";
+		if(mesh_type == MeshType::FILE_MESH)
+			result = "Mesh from file";
+		else if(mesh_type == MeshType::BOX_MESH)
+			result = "Hyper rectangle";
+		else if(mesh_type == MeshType::SQUARE_CHEESE)
+			result = "Square spacing swiss cheese";
+		else if(mesh_type == MeshType::HEX_CHEESE)
+			result = "Hexagonal spacing swiss cheese";
+		else if(mesh_type == MeshType::MIXER)
+			result = "Mixer tube";
+		else if(mesh_type == MeshType::FILTER)
+			result = "Filter";
+		else if(mesh_type == MeshType::SPLITTER)
+			result = "Splitter";
+		else
+			result = "ERROR";
+
+		return result;
+	}
+
+
+	MeshType stringToMeshType(std::string value)
+	{
+		if( boost::iequals(value, "File mesh") || (boost::iequals(value,"FILE_MESH") ) )
+			return MeshType::FILE_MESH;
+		else if( boost::iequals(value, "Box") || (boost::iequals(value,"BOX_MESH") ) )
+			return MeshType::BOX_MESH;
+		else if( boost::iequals(value, "Mixer") )
+			return MeshType::MIXER;
+		else if( boost::iequals(value, "Filter") )
+			return MeshType::FILTER;
+		else if( boost::iequals(value, "Splitter") )
+			return MeshType::SPLITTER;
+
+		// legacy:	
+		else if( boost::iequals(value,"SQUARE_CHEESE") )
+			return MeshType::SQUARE_CHEESE;
+		else if( boost::iequals(value,"HEX_CHEESE") )
+			return MeshType::HEX_CHEESE;
+
+		else
+		{
+			std::string msg = "Invalid string! Could not convert <"
+							+ value
+							+ "> to mesh type.";
+			throw std::invalid_argument(msg.c_str());
+		}
+	}
+
+/** \brief Geometry class for constucting mesh support and
+* handling bacteria collisions with boundaries
+*/
 template<int dim>
 class Geometry{
 public:
@@ -37,42 +144,16 @@ public:
 	         const Point<dim>& upper,
 	         const std::array<BoundaryCondition, dim>& bcs);  
 
-	// Geometry(const Geometry &geo); // copy constructor
-
-	static void declare_parameters(ParameterHandler& prm);
-
-	void init(const ParameterHandler& prm);
-
-	// LEGACY INITIALIZATION:
-	void initialize(std::string geoFile, std::string meshFile = "");
-	void initialize(GeoTypes::Filter filter);
-	void initialize(GeoTypes::Mixer mixer); 
-	void initialize(GeoTypes::Pipe pipe); 
-	void initialize(GeoTypes::Splitter splitter); 
-
-	// create_filter_geometry(unsigned int number_channels,
-	//                             double channel_thickness,
-	//                             double wall_thickness,
-	//                             double filter_left,
-	//                             double filter_center,
-	//                             double filter_right);
-
-
-	// OPERATORS:
-	Geometry<dim>& operator=(const Geometry& rhs);
-
-	template<int dimension>
-	friend std::ostream& operator<<(std::ostream& out, const Geometry<dimension>& geo);
-
 	// accessors:
 	Point<dim> getBottomLeftPoint() const;
 	Point<dim> getTopRightPoint() const;
-	double getScaleFactor() const;
+	// double getScaleFactor() const;
 	std::array<unsigned int, dim> getDiscretization() const;
 	double getWidth(unsigned int direction) const;
 	std::array<BoundaryCondition, dim> getBoundaryConditions() const;
-	MeshType getMeshType() const;
-	std::string getMeshFile() const;
+
+	MeshType getMeshType() const; // move to legacy
+	std::string getMeshFile() const; // move to legacy
 
 	/// sphere accessors:
 	std::vector<Sphere<dim> > getSpheres() const;
@@ -85,39 +166,56 @@ public:
 	HyperRectangle<dim> getRectangleAt(unsigned int i) const;
 
 	// mutators:
-	void setBottomLeftPoint(const Point<dim>& lower);
-	void setTopRightPoint(const Point<dim>& upper);
-	void setScaleFactor(double s);
+	void setBottomLeftPoint(const Point<dim>& lower); // remove
+	void setTopRightPoint(const Point<dim>& upper); // remove
+
 	void setBoundaryConditions(const std::array<BoundaryCondition, dim>& bcs);
-	void setMeshType(MeshType mtype);
+	
+	void setMeshType(MeshType mtype); // remove
+
 	void addSphere(const Sphere<dim>& sp);
 	void addRectangle(const HyperRectangle<dim>& rect);
 
-	void rescale();
-
+// MAIN KEEPING:
+// ----------------------------------------------
 	// interface:
 	// functions:
 	void checkBoundaries(const Point<dim>& oldPoint, 
 	                   Point<dim>& newPoint,
 	                   const double buffer = 0.005) const; // only function bacteria uses***
 
-	bool isInDomain(const Point<dim>& location) const;
+	bool isInDomain(const Point<dim>& location) const; // used by initializations
 
 	void addPointBuffer(const double buffer,
 	                   const Point<dim>& test_point,
-	                   Point<dim>& buffered_point) const; 
+	                   Point<dim>& buffered_point) const;  // not sure where, maybe cell map
 
 	void printInfo(std::ostream& out) const;
 	void outputGeometry(std::string output_directory = ".") const;
 
 	// for debugging:
 	std::vector<Point<dim> > getQuerryPoints(double resolution = 0.2) const; 
+// ----------------------------------------------
+
 private:
+	void init(const ParameterHandler& prm); // move to legacy
+
+
+// REFACTOR CHECKS:
+		// LEGACY INITIALIZATION: // move to separate file?
+		// want easy way to incorporate new geometries and corresponding meshes
+		// what's the appropriate pattern???
+	void initialize(std::string geoFile, std::string meshFile = "");
+	void initialize(GeoTypes::Filter filter);
+	void initialize(GeoTypes::Mixer mixer); 
+	void initialize(GeoTypes::Pipe pipe); 
+	void initialize(GeoTypes::Splitter splitter); 
+	static void declare_parameters(ParameterHandler& prm); // move to legacy
+// ------------------------------------------------------------------------------------
+
 	// bounding box:
 	Point<dim> bottom_left;
 	Point<dim> top_right;
-
-	double scale; // (legacy)
 
 	std::array<BoundaryCondition, dim> boundary_conditions; 
 
@@ -126,37 +224,14 @@ private:
 
 	// bounding circle or cylinder
 	// double boundaryRadius; // perhaps change to just have ``interior obstacle...''
-
 	// obstacles:
 	std::vector<Sphere<dim> > spheres;
 	std::vector<HyperRectangle<dim> > rectangles;
-	// cylinders
-	// ellipsoids ...
-	// ... each can be bounding or internal....
 
 	MeshType mesh_type;
-	std::string mesh_file;
+	std::string mesh_file; // remove these too ...
 
-	// reflecting off spheres: 
-	/// these functions should actually be implemented in the sphere class...
-	void reflectSphere(const unsigned int sphere_id, 
-	              const Point<dim>& oldPoint, 
-	              Point<dim>& newPoint,
-	               const double buffer = 0.) const;
-
-	bool isInSphere(const unsigned int sphere_id, 
-	            const Point<dim>& location,
-	            const double buffer = 0.) const;
-
-	Point<dim> getLineSphereIntersection(const unsigned int sphere_id, 
-	                                const Point<dim>& oldPoint, 
-	                                const Point<dim>& newPoint, 
-	                                const double buffer = 0.) const;
-
-	Tensor<1, dim> getSphereNormalVector(const unsigned int sphere_id, 
-	                                const Point<dim>& intersection_point
-	                                ) const;
-
+// move these to separate file:
 	static void declare_filter_parameters(ParameterHandler& prm);
 	static void declare_mixer_parameters(ParameterHandler& prm);
 	static void declare_splitter_parameters(ParameterHandler& prm);
@@ -187,8 +262,8 @@ private:
 // CONSTRUCTORS:
 template<int dim>
 Geometry<dim>::Geometry()
-	:
-	scale(1)
+	// :
+	// scale(1)
 {}
 
 
@@ -198,7 +273,7 @@ Geometry<dim>::Geometry(const Point<dim>& lower,
 	:
 	bottom_left(lower),
 	top_right(upper),
-	scale(1),
+	// scale(1),
 	boundary_conditions(bcs)
 {
 	for(unsigned int i = 0; i < dim; i++)
@@ -218,21 +293,21 @@ Geometry<2>::declare_parameters(ParameterHandler& prm)
 		          "Geometry type. Options are Box, Filter, Mixer "
 		          "Splitter, of File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
-		prm.declare_entry("Geometry file",
-		          "",
-		          Patterns::Anything(),
-		          "Name of geometry file to initialize geometry from. "
-		          "Mesh type of geometry file should match mesh type "
-		          "given for grid construction.");
-		prm.declare_entry("Bottom left","{0,0}",Patterns::List(Patterns::Double()));
-		prm.declare_entry("Top right","{5,5}",Patterns::List(Patterns::Double()));
-		prm.declare_entry("Boundary conditions",
-		          "{WRAP,WRAP}",
-		          Patterns::List(Patterns::Selection("WRAP|REFLECT|OPEN")),
-		          "Boundary conditions.");
-		declare_filter_parameters(prm);
-		declare_mixer_parameters(prm);
-		declare_splitter_parameters(prm);
+		// prm.declare_entry("Geometry file",
+		//           "",
+		//           Patterns::Anything(),
+		//           "Name of geometry file to initialize geometry from. "
+		//           "Mesh type of geometry file should match mesh type "
+		//           "given for grid construction.");
+		// prm.declare_entry("Bottom left","{0,0}",Patterns::List(Patterns::Double()));
+		// prm.declare_entry("Top right","{5,5}",Patterns::List(Patterns::Double()));
+		// prm.declare_entry("Boundary conditions",
+		//           "{WRAP,WRAP}",
+		//           Patterns::List(Patterns::Selection("WRAP|REFLECT|OPEN")),
+		//           "Boundary conditions.");
+		// declare_filter_parameters(prm);
+		// declare_mixer_parameters(prm);
+		// declare_splitter_parameters(prm);
 	prm.leave_subsection();
 }
 
@@ -448,48 +523,6 @@ boundary_conditions[0] = BoundaryCondition::OPEN;
 boundary_conditions[1] = BoundaryCondition::REFLECT; 
 }
 
-// ASSIGNMENT OPERATORS:
-template<int dim>
-Geometry<dim>& Geometry<dim>::operator=(const Geometry& rhs)
-{
-// check for self copy:
-if(this == &rhs)
- return *this;
-
-// copy:
-bottom_left = rhs.bottom_left;
-top_right = rhs.top_right;
-scale = rhs.scale;
-boundary_conditions = rhs.boundary_conditions; // should work without loop? 
-spheres = rhs.spheres;
-rectangles = rhs.rectangles;
-
-return *this;
-}
-
-
-template<int dim>
-std::ostream& operator<<(std::ostream& out, const Geometry<dim>& geo)
-{
-out << std::endl << "Dimension: " << dim << std::endl
- << "BottomLeft: " << geo.bottom_left << std::endl
- << "TopRight: " << geo.top_right << std::endl;
-
-out << "Boundary Conditions: " << std::endl;
-for(unsigned int i=0; i < dim; i++)
- out << i << "th boundary: " << geo.boundary_conditions[i] << std::endl; // enum to ostream?
-
-// HERE, overload << for spheres instead...
-out << "Number of Spheres: " << geo.spheres.size() << std::endl;
-for(unsigned int i = 0; i < geo.spheres.size(); i++)
- out << "\t Sphere Center: " << geo.spheres[i].getCenter() 
-   << " Radius: " << geo.spheres[i].getRadius() << std::endl;
-
-return out;
-}
-
-
-
 // ACCESSORS:
 template<int dim>
 Point<dim> Geometry<dim>::getBottomLeftPoint() const
@@ -503,11 +536,11 @@ Point<dim> Geometry<dim>::getTopRightPoint() const
 return top_right;
 }
 
-template<int dim>
-double Geometry<dim>::getScaleFactor() const
-{
-return scale;
-}
+// template<int dim>
+// double Geometry<dim>::getScaleFactor() const
+// {
+// return scale;
+// }
 
 template<int dim>
 double Geometry<dim>::getWidth(unsigned int direction) const
@@ -598,12 +631,6 @@ top_right = upper;
 }
 
 template<int dim>
-void Geometry<dim>::setScaleFactor(double s)
-{
-scale = s;
-}
-
-template<int dim>
 void Geometry<dim>::setBoundaryConditions(const std::array<BoundaryCondition, dim>& bcs)
 {
 boundary_conditions = bcs;
@@ -643,7 +670,7 @@ void Geometry<dim>::initialize(std::string geometryFile, std::string meshFile)
    std::string delimiter = " ";
 
    bool usingDefaultDiscretization = true;
-   scale = 1;
+   // scale = 1;
 
    /// FILTER PARAMETERS:
    unsigned int number_channels;
@@ -734,7 +761,7 @@ void Geometry<dim>::initialize(std::string geometryFile, std::string meshFile)
          lineRead >> category;
          double value;
          lineRead >> value;
-         scale = value;
+         // scale = value;
          // move to next line
          std::getline(infile,line); 
        }
@@ -867,8 +894,8 @@ void Geometry<dim>::initialize(std::string geometryFile, std::string meshFile)
          (top_right[dim_itr] - bottom_left[dim_itr]) );
    }
 
-   if(scale != 1)
-     rescale();
+   // if(scale != 1)
+   //   rescale();
 } // initialize() -- probably want to break/clean this up...
 
 
@@ -1003,29 +1030,6 @@ spheres.push_back(Sphere<2>(Point<2>(center_x, center_y) ,radius));
 }
 
 
-template<int dim>
-void Geometry<dim>::rescale()
-{
-// rescale bounding box:
-bottom_left = scale*bottom_left;
-top_right = scale*top_right;
-
-// rescale spheres:
-for(unsigned int i = 0; i < spheres.size(); i++)
-{
- spheres[i].setCenter(scale*spheres[i].getCenter());
- spheres[i].setRadius(scale*spheres[i].getRadius());
-}
-
-// rescale hyper_rectangles:
-for(unsigned int i = 0; i < rectangles.size(); i++)
-{
- rectangles[i].setBottomLeft(rectangles[i].getBottomLeft());
- rectangles[i].setTopRight(rectangles[i].getTopRight());
-}
-}
-
-
 // FUNCTIONS:
 template<int dim>
 void 
@@ -1037,16 +1041,16 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 	// check interior spheres:
 	unsigned int number_spheres = spheres.size();
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
-		// if( (spheres[sphere_id].distance_from_border(newPoint) - buffer) < tolerance)
-		// {
-		// 	spheres[sphere_id].reflectPoint(oldPoint, newPoint, buffer); 
-		// 	break;
-		// }
-		if(isInSphere(sphere_id,newPoint, buffer))
+		if( (spheres[sphere_id].distance_from_border(newPoint) - buffer) < tolerance)
 		{
-			reflectSphere(sphere_id,oldPoint,newPoint, buffer); /** @todo move to sphere class */
-			break; // assuming don't hit mutliple circles -- otherwise need to do something else
+			spheres[sphere_id].reflectPoint(oldPoint, newPoint, buffer); 
+			break;
 		}
+		// if(isInSphere(sphere_id,newPoint, buffer))
+		// {
+		// 	reflectSphere(sphere_id,oldPoint,newPoint, buffer); * @todo move to sphere class 
+		// 	break; // assuming don't hit mutliple circles -- otherwise need to do something else
+		// }
 
 	// check interior rectangles:
 	unsigned int number_rectangles = rectangles.size();
@@ -1082,109 +1086,6 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 	} // for dim
 } // check_boundaries()
 
-template<int dim>
-void 
-Geometry<dim>::reflectSphere(const unsigned int sphere_id, 
-                         const Point<dim>& oldPoint, 
-                         Point<dim>& newPoint,
-                         const double buffer) const
-{
-const Point<dim> intersection = getLineSphereIntersection(sphere_id, 
-                                                         oldPoint, 
-                                                         newPoint,
-                                                         buffer);
-
-const Tensor<1,dim> normal = getSphereNormalVector(sphere_id, 
-                                                 intersection); 
-
-const Tensor<1,dim> incident = newPoint - oldPoint;
-const Tensor<1,dim> transmitted = newPoint - intersection;
-
-Tensor<1,dim> reflected_point;
-reflected_point = incident - 2.0*( incident*normal )*normal;
-
-// rescale:
-reflected_point *= (transmitted.norm())/(reflected_point.norm());
-
-// recenter (shift vector origin)
-newPoint = intersection + reflected_point;
-}
-
-
-template<int dim> 
-Point<dim> Geometry<dim>::getLineSphereIntersection(const unsigned int sphere_id, 
-                                                 const Point<dim>& oldPoint, 
-                                                 const Point<dim>& newPoint,
-                                                 const double buffer) const
-{
-const double radius = spheres[sphere_id].getRadius() + buffer;
-const Point<dim> center = spheres[sphere_id].getCenter();
-// line origin:
-const Point<dim> origin = oldPoint;
-// direction of line:  ( line = origin + d*direction)
-Tensor<1,dim> direction = newPoint - oldPoint;
-direction /= direction.norm(); // unit vector
-
-// Joachimsthal's Equation:
-// d = -b +/- sqrt[ b^2 - c] ... a == 1
-const double b = direction*( origin - center );
-const double c = (origin - center)*(origin - center) - radius*radius;
-
-const double discriminant = b*b - c;
-
-if(discriminant < 0)
- throw std::runtime_error("Error: Line does not intersect sphere");
-
-if(discriminant == 0)
- return origin + (-b)*direction;
-
-const Point<dim> first_intersection = origin + (-b + std::sqrt(discriminant))*direction;
-const Point<dim> second_intersection = origin + (-b - std::sqrt(discriminant))*direction;
-
-// pick point closest to old point:
-if( oldPoint.distance(first_intersection) < oldPoint.distance(second_intersection) )
- return first_intersection;
-else
- return second_intersection;
-}
-
-
-/** these (v) should be members of the sphere class instead 
-*/
-
-   template<int dim>
-   Tensor<1, dim> Geometry<dim>::getSphereNormalVector(const unsigned int sphere_id, 
-                                               const Point<dim>& intersection_point) const
-   {
-     Tensor<1,dim> normal = intersection_point - spheres[sphere_id].getCenter();
-
-     // rescale (normalize):
-     normal /= normal.norm(); 
-
-     return normal;
-   }
-
-
-   template<int dim>
-   bool 
-   Geometry<dim>::isInSphere(unsigned int sphere_id, 
-                             const Point<dim>& location,
-                             const double buffer) const
-   {
-     unsigned int number_spheres = spheres.size();
-
-     if(sphere_id >= number_spheres)
-       throw std::invalid_argument("Trying to access non-existing sphere.");
-
-     if( location.distance(spheres[sphere_id].getCenter()) < 
-           (spheres[sphere_id].getRadius() + buffer) )
-       return true;
-
-     return false;
-   }
-
-/** these (^) should be members of the sphere class instead 
-*/
 
 template<int dim>
 bool Geometry<dim>::isInDomain(const Point<dim>& location) const
@@ -1197,7 +1098,7 @@ bool Geometry<dim>::isInDomain(const Point<dim>& location) const
 	// check obstacles...
 	unsigned int number_spheres = spheres.size();
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
-	 if(isInSphere(sphere_id, location))
+	 if( spheres[sphere_id].isInSphere(location))
 	   return false;
 
 	unsigned int number_rectangles = rectangles.size();
@@ -1219,10 +1120,9 @@ buffered_point = test_point;
 // add buffer to spheres-- assuming already outside of actual sphere:
 unsigned int number_spheres = spheres.size();
 for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
- if(isInSphere(sphere_id, test_point, buffer))
+ if(spheres[sphere_id].isInSphere(test_point, buffer))
  {
-   Tensor<1,dim> normal = getSphereNormalVector(sphere_id,
-                                               test_point);
+   Tensor<1,dim> normal = spheres[sphere_id].getSphereNormalVector(test_point);
   
    buffered_point = buffered_point + buffer*normal;
 
@@ -1321,7 +1221,7 @@ out << "DIMENSION: " << dim << std::endl
  << "\t BottomLeft: " << bottom_left << std::endl
  << "\t TopRight: " << top_right << std::endl;
 
-out << "\nSCALE: " << scale << std::endl;
+// out << "\nSCALE: " << scale << std::endl;
 
 out << "\nBOUNDARY CONDITIONS: " << std::endl;
 for(unsigned int i=0; i < dim; i++)
@@ -1353,26 +1253,210 @@ template<int dim>
 void 
 Geometry<dim>::outputGeometry(std::string output_directory) const
 {
-// boundary:
-std::ofstream boundary_out(output_directory + "/boundary.dat");
-boundary_out << bottom_left << std::endl
-<< top_right << std::endl;
+	// general info:
+	std::ofstream geo_out(output_directory + "/geometryInfo.dat");
+	this->printInfo(geo_out);
 
-// spheres:
-std::ofstream spheres_out(output_directory + "/spheres.dat");
-for(unsigned int i = 0; i < spheres.size(); ++i)
- spheres_out << spheres[i].getCenter() << " " << spheres[i].getRadius() << std::endl;
+	// boundary:
+	std::ofstream boundary_out(output_directory + "/boundary.dat");
+	boundary_out << bottom_left << std::endl
+		<< top_right << std::endl;
 
-// rectangles:
-std::ofstream rect_out(output_directory + "/rectangles.dat");
-for(unsigned int i = 0; i < rectangles.size(); ++i)
- rect_out << rectangles[i].getBottomLeft() << " " 
-     << rectangles[i].getTopRight() << std::endl;
+	// spheres:
+	std::ofstream spheres_out(output_directory + "/spheres.dat");
+	for(unsigned int i = 0; i < spheres.size(); ++i)
+		spheres_out << spheres[i].getCenter() << " " 
+			<< spheres[i].getRadius() << std::endl;
+
+	// rectangles:
+	std::ofstream rect_out(output_directory + "/rectangles.dat");
+	for(unsigned int i = 0; i < rectangles.size(); ++i)
+		rect_out << rectangles[i].getBottomLeft() << " " 
+			<< rectangles[i].getTopRight() << std::endl;
 }
 
 
+// LEGACY:
 
-}
+// template<int dim>
+// void 
+// Geometry<dim>::reflectSphere(const unsigned int sphere_id, 
+//                          const Point<dim>& oldPoint, 
+//                          Point<dim>& newPoint,
+//                          const double buffer) const
+// {
+// const Point<dim> intersection = getLineSphereIntersection(sphere_id, 
+//                                                          oldPoint, 
+//                                                          newPoint,
+//                                                          buffer);
+
+// const Tensor<1,dim> normal = getSphereNormalVector(sphere_id, 
+//                                                  intersection); 
+
+// const Tensor<1,dim> incident = newPoint - oldPoint;
+// const Tensor<1,dim> transmitted = newPoint - intersection;
+
+// Tensor<1,dim> reflected_point;
+// reflected_point = incident - 2.0*( incident*normal )*normal;
+
+// // rescale:
+// reflected_point *= (transmitted.norm())/(reflected_point.norm());
+
+// // recenter (shift vector origin)
+// newPoint = intersection + reflected_point;
+// }
 
 
+/** these (v) should be members of the sphere class instead 
+*/
+
+// template<int dim> 
+// Point<dim> Geometry<dim>::getLineSphereIntersection(const unsigned int sphere_id, 
+//                                                  const Point<dim>& oldPoint, 
+//                                                  const Point<dim>& newPoint,
+//                                                  const double buffer) const
+// {
+// const double radius = spheres[sphere_id].getRadius() + buffer;
+// const Point<dim> center = spheres[sphere_id].getCenter();
+// // line origin:
+// const Point<dim> origin = oldPoint;
+// // direction of line:  ( line = origin + d*direction)
+// Tensor<1,dim> direction = newPoint - oldPoint;
+// direction /= direction.norm(); // unit vector
+
+// // Joachimsthal's Equation:
+// // d = -b +/- sqrt[ b^2 - c] ... a == 1
+// const double b = direction*( origin - center );
+// const double c = (origin - center)*(origin - center) - radius*radius;
+
+// const double discriminant = b*b - c;
+
+// if(discriminant < 0)
+//  throw std::runtime_error("Error: Line does not intersect sphere");
+
+// if(discriminant == 0)
+//  return origin + (-b)*direction;
+
+// const Point<dim> first_intersection = origin + (-b + std::sqrt(discriminant))*direction;
+// const Point<dim> second_intersection = origin + (-b - std::sqrt(discriminant))*direction;
+
+// // pick point closest to old point:
+// if( oldPoint.distance(first_intersection) < oldPoint.distance(second_intersection) )
+//  return first_intersection;
+// else
+//  return second_intersection;
+// }
+
+
+   // template<int dim>
+   // Tensor<1, dim> Geometry<dim>::getSphereNormalVector(const unsigned int sphere_id, 
+   //                                             const Point<dim>& intersection_point) const
+   // {
+   //   Tensor<1,dim> normal = intersection_point - spheres[sphere_id].getCenter();
+
+   //   // rescale (normalize):
+   //   normal /= normal.norm(); 
+
+   //   return normal;
+   // }
+
+
+   // template<int dim>
+   // bool 
+   // Geometry<dim>::isInSphere(unsigned int sphere_id, 
+   //                           const Point<dim>& location,
+   //                           const double buffer) const
+   // {
+   //   unsigned int number_spheres = spheres.size();
+
+   //   if(sphere_id >= number_spheres)
+   //     throw std::invalid_argument("Trying to access non-existing sphere.");
+
+   //   if( location.distance(spheres[sphere_id].getCenter()) < 
+   //         (spheres[sphere_id].getRadius() + buffer) )
+   //     return true;
+
+   //   return false;
+   // }
+
+/** these (^) should be members of the sphere class instead 
+*/
+
+
+
+
+
+
+
+
+
+// // ASSIGNMENT OPERATORS:
+// template<int dim>
+// Geometry<dim>& Geometry<dim>::operator=(const Geometry& rhs)
+// {
+// // check for self copy:
+// if(this == &rhs)
+//  return *this;
+
+// // copy:
+// bottom_left = rhs.bottom_left;
+// top_right = rhs.top_right;
+// scale = rhs.scale;
+// boundary_conditions = rhs.boundary_conditions; // should work without loop? 
+// spheres = rhs.spheres;
+// rectangles = rhs.rectangles;
+
+// return *this;
+// }
+
+
+// template<int dim>
+// std::ostream& operator<<(std::ostream& out, const Geometry<dim>& geo)
+// {
+// out << std::endl << "Dimension: " << dim << std::endl
+//  << "BottomLeft: " << geo.bottom_left << std::endl
+//  << "TopRight: " << geo.top_right << std::endl;
+
+// out << "Boundary Conditions: " << std::endl;
+// for(unsigned int i=0; i < dim; i++)
+//  out << i << "th boundary: " << geo.boundary_conditions[i] << std::endl; // enum to ostream?
+
+// // HERE, overload << for spheres instead...
+// out << "Number of Spheres: " << geo.spheres.size() << std::endl;
+// for(unsigned int i = 0; i < geo.spheres.size(); i++)
+//  out << "\t Sphere Center: " << geo.spheres[i].getCenter() 
+//    << " Radius: " << geo.spheres[i].getRadius() << std::endl;
+
+// return out;
+// }
+
+// template<int dim>
+// void Geometry<dim>::setScaleFactor(double s)
+// {
+// scale = s;
+// }
+
+// template<int dim>
+// void Geometry<dim>::rescale()
+// {
+// // rescale bounding box:
+// bottom_left = scale*bottom_left;
+// top_right = scale*top_right;
+
+// // rescale spheres:
+// for(unsigned int i = 0; i < spheres.size(); i++)
+// {
+//  spheres[i].setCenter(scale*spheres[i].getCenter());
+//  spheres[i].setRadius(scale*spheres[i].getRadius());
+// }
+
+// // rescale hyper_rectangles:
+// for(unsigned int i = 0; i < rectangles.size(); i++)
+// {
+//  rectangles[i].setBottomLeft(rectangles[i].getBottomLeft());
+//  rectangles[i].setTopRight(rectangles[i].getTopRight());
+// }
+// }
+
+} // CLOSE NAMESPACE
 #endif 

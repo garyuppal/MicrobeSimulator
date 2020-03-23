@@ -5,13 +5,61 @@
 #include "./bacteria_fitness.h"
 
 #include "../utility/parameter_handler.h"
-#include "../simulators/simulation_tools.h" // move this method to this file...
 #include "../geometry/geometry.h"
 
 #include <vector>
 #include <memory>
 
 namespace MicrobeSimulator{ namespace BacteriaNew{
+
+/** \brief Method to get valid locations in geometry domain
+*  for seeding bacteria groups
+*/
+template<int dim>
+std::vector<Point<dim> >
+get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups,
+	double left_length = -1)
+{
+	/** @todo Add buffer so groups do not come too close to objects when using
+	* non-zero buffer
+	*/
+	std::cout << "...Finding " << number_groups
+		<< " group positions" << std::endl;
+
+	std::vector<Point<dim> > group_locations;
+	group_locations.reserve(number_groups);
+
+	Point<dim> temp_point;
+	for(unsigned int i = 0; i < number_groups; ++i)
+	{
+		bool found = false;
+
+		while(!found)
+		{
+		  for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+		  {
+		  	double width = geometry.getWidth(dim_itr);
+
+		  	// possibly initialize in subdomain:
+		  	if( (dim_itr == 0) && (left_length > 0) )
+		  		width = left_length; 
+
+		    temp_point[dim_itr] = (width)*((double)rand() / RAND_MAX) 
+		      + geometry.getBottomLeftPoint()[dim_itr];
+		  }
+
+		  if( geometry.isInDomain(temp_point) )
+		  {
+		    group_locations.emplace_back(temp_point);
+		    found = true;
+		  }
+		} // while not found
+	} // for group locations
+	std::cout << "...Group positions found." << std::endl;
+
+	return group_locations;
+}
+
 
 /** \brief Bacteria handler class
 */
@@ -138,7 +186,7 @@ BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<d
 		if(number_groups == 0)
 			number_groups = n_bact;
 		const double left_length = prm.get_double(section, "Left subdomain length");
-		initial_locations = SimulationTools::get_bacteria_locations(geo, number_groups, left_length);
+		initial_locations = get_bacteria_locations(geo, number_groups, left_length);
 	}
 
 	for(unsigned int i = 0; i < n_bact; ++i)

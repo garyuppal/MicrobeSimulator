@@ -6,7 +6,7 @@
 // #include "../utility/enum_types.h"
 #include "./velocity_functions.h"
 #include "./stokes_solver.h"
-#include "../simulators/grid_generation_tools.h"
+#include "../geometry/grid_generation_tools.h"
 
 #include <memory>
 
