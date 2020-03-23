@@ -876,25 +876,25 @@ Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 /** @todo add option to extrude to 3D */
 template<int dim>
 void 
-Mixer<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+Mixer<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
 {
-	/** @todo Change if...throw 's to assertions */
-	if(geo.getNumberSpheres() != 2)
-		throw std::runtime_error("Geometry should have two spheres for mixer mesh");
-	if(geo.getSphereAt(0).getCenter()[0] != geo.getSphereAt(1).getCenter()[0])
-		throw std::runtime_error("Two spheres should have same x-coordinate for mixer mesh");
+	// /** @todo Change if...throw 's to assertions */
+	// if(geo.getNumberSpheres() != 2)
+	// 	throw std::runtime_error("Geometry should have two spheres for mixer mesh");
+	// if(geo.getSphereAt(0).getCenter()[0] != geo.getSphereAt(1).getCenter()[0])
+	// 	throw std::runtime_error("Two spheres should have same x-coordinate for mixer mesh");
 
-	// bottom left point should be at origin
-	if(geo.getBottomLeftPoint()[0] != 0 || geo.getBottomLeftPoint()[1] != 0)
-		throw std::runtime_error("Bottom left corner for mixer mesh should be located at the origin");
+	// // bottom left point should be at origin
+	// if(geo.getBottomLeftPoint()[0] != 0 || geo.getBottomLeftPoint()[1] != 0)
+	// 	throw std::runtime_error("Bottom left corner for mixer mesh should be located at the origin");
 
-	if(right_length < 0)
-		std::runtime_error("Top right point should be located to the right of sphere for mixer mesh");
+	// if(right_length < 0)
+	// 	std::runtime_error("Top right point should be located to the right of sphere for mixer mesh");
 
-	// const double buffer = build_mixer_mesh(left_length, right_length, height, radius, tria);
-	// :::::
-		if(height < (2.*radius) )
-			throw std::invalid_argument("Mixer height must be larger than diameter");
+	// // const double buffer = build_mixer_mesh(left_length, right_length, height, radius, tria);
+	// // :::::
+	// 	if(height < (2.*radius) )
+	// 		throw std::invalid_argument("Mixer height must be larger than diameter");
 
 		Triangulation<2> center;
 		construct_mixer_center(center); 
@@ -1069,6 +1069,10 @@ private:
 	double left;
 	double right;
 	double radius;
+
+	// support methods:
+	void construct_splitter_center(Triangulation<dim>& tria) const;
+	void add_splitter_ends(Triangulation<dim>& center, Triangulation<dim>& tria) const;
 };
 
 // IMPL
@@ -1145,9 +1149,11 @@ Splitter<dim>::build_geometry(Geometry<dim>& geo) const
 */
 template<int dim>
 void 
-Splitter<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+Splitter<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
 {
-	/** @todo ...still need to implement */
+  Triangulation<2> center;
+  construct_splitter_center(center);
+  add_splitter_ends(center, tria);
 }
 
 /** \brief Display info for Splitter object */
@@ -1166,7 +1172,77 @@ Splitter<dim>::printInfo(std::ostream& out) const
 }
 
 
+// support methods:
+template<int dim>
+void 
+Splitter<dim>::construct_splitter_center(Triangulation<dim>& tria) const
+{
+    const double outer_radius = 0.5*height;
+    const double inner_radius = radius;
 
+    dealii::GridGenerator::hyper_cube_with_cylindrical_hole (tria,
+						                                    inner_radius,
+						                                    outer_radius);
+    // shift corner to origin:
+    Tensor<1,2> shift_vector;
+    shift_vector[0] = outer_radius;
+    shift_vector[1] = outer_radius;
+
+    dealii::GridTools::shift(shift_vector, tria);
+}
+
+template<int dim>
+void 
+Splitter<dim>::add_splitter_ends(Triangulation<dim>& center, 
+									Triangulation<dim>& tria) const
+{
+	// center tile will be a `buffer' length wider than radius
+	// we adjust left and right lengths accordingly to get desired lengths
+	const double buffer = 0.5*height - radius;
+	const double left_width = left - buffer;
+	const double right_width = right - buffer;
+
+	// assert modified lengths are positive:
+	assert(left_width>0);
+	assert(right_width>0);
+
+	Triangulation<dim> side_tile;
+
+	std::vector<unsigned int> repetitions(dim,2);
+
+	repetitions[0] = 1 + std::floor(left_width/height);
+
+	// for dim == 2 -- can extrude this tile for dim == 3 :
+	dealii::GridGenerator::subdivided_hyper_rectangle(side_tile,
+	                                                repetitions,
+	                                                Point<2>(0,0),
+	                                                Point<2>(left_width,height));
+
+	// shift center and merge:
+	Tensor<1,2> shift_vector;
+	shift_vector[0] = left_width;
+	shift_vector[1] = 0.;
+
+	dealii::GridTools::shift(shift_vector, center);
+	dealii::GridGenerator::merge_triangulations(side_tile,center,tria);
+
+	// generate RIGHT side:
+	side_tile.clear();
+
+	repetitions[0] = 1 + std::floor(right_width/height);
+
+	// for dim == 2 -- can extrude this tile for dim == 3 :
+	dealii::GridGenerator::subdivided_hyper_rectangle(side_tile,
+	                                                repetitions,
+	                                                Point<2>(0,0),
+	                                                Point<2>(right_width,height));
+
+	shift_vector[0] = left_width + height; // center width = height
+	dealii::GridTools::shift(shift_vector, side_tile);
+
+	// final merge:
+	dealii::GridGenerator::merge_triangulations(side_tile,tria,tria);
+}
 
 
 
