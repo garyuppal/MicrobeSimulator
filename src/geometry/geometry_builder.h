@@ -24,11 +24,13 @@
 #include "../utility/parameter_handler.h"
 #include "./geometry.h"
 
-// STILL TO ADD:
-// -----------------------------------------------
-// SPLITTER
-// VORTEX AND CYLINDER
-// SWISS CHEESE
+/** @file
+* @todo add vortex/cylinder
+* @todo add 3D versions of filter, mixer, splitter, and box
+* @todo add file type
+* @todo add swiss cheese
+*/
+
 
 namespace MicrobeSimulator{ 
 
@@ -147,6 +149,7 @@ protected:
 // IMPL
 // ---------------------------------------------------------
 // mesh construction support methods:
+/** \brief Constuctor for base class for builder classes */
 template<int dim>
 BuilderBase<dim>::BuilderBase(const ParameterHandler& prm)
 	:
@@ -366,6 +369,7 @@ BuilderBase<dim>::refine_boundary(const Geometry<dim>& geo, Triangulation<dim>& 
 	std::cout << "...refined boundary " << boundary_refinement << " times" << std::endl;
 }
 
+/** \brief Display mesh refinement info */
 template<int dim>
 void 
 BuilderBase<dim>::printMeshInfo(std::ostream& out)
@@ -411,6 +415,7 @@ private:
 
 // IMPL
 // ---------------------------------------------
+/** \brief Constructor for simple box type geometry builder */
 template<int dim>
 Box<dim>::Box(const ParameterHandler& prm)
 	:
@@ -434,6 +439,7 @@ Box<dim>::Box(const ParameterHandler& prm)
 }
 
 // class parameters:
+/** \brief Two dimensional declaration for box class parameters */
 template<>
 void 
 Box<2>::declare_parameters(ParameterHandler& prm)
@@ -448,6 +454,7 @@ Box<2>::declare_parameters(ParameterHandler& prm)
 	prm.leave_subsection();
 }
 
+/** \brief Three dimensional declaration for box class parameters */
 template<>
 void 
 Box<3>::declare_parameters(ParameterHandler& prm)
@@ -465,6 +472,8 @@ Box<3>::declare_parameters(ParameterHandler& prm)
 }
 
 // override virtual methods:
+
+/** \brief Build geometry for box type*/
 template<int dim>
 void 
 Box<dim>::build_geometry(Geometry<dim>& geo) const
@@ -474,6 +483,7 @@ Box<dim>::build_geometry(Geometry<dim>& geo) const
 	geo.setBoundaryConditions(this->boundary_conditions);
 }
 
+/** \brief Build grid for box geometry */
 template<int dim>
 void 
 Box<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
@@ -501,6 +511,7 @@ Box<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tr
 			                                        /*colorize*/ false); // relabeling anyways
 }
 
+/** \brief Print info for box builder */
 template<int dim>
 void 
 Box<dim>::printInfo(std::ostream& out) const
@@ -557,7 +568,7 @@ private:
 // IMPL
 // -----------------------------------------------------------------
 
-/** Parameter declaration for filter class */
+/** \brief Parameter declaration for filter class */
 template<int dim>
 void 
 Filter<dim>::declare_parameters(ParameterHandler& prm)
@@ -574,7 +585,7 @@ Filter<dim>::declare_parameters(ParameterHandler& prm)
 	prm.leave_subsection();
 } // maybe separate declarations for 2 and 3 (option to extrude)
 
-/** Constructor for filter class */
+/** \brief Constructor for filter class */
 template<int dim>
 Filter<dim>::Filter(const ParameterHandler& prm)
 	:
@@ -589,7 +600,7 @@ Filter<dim>::Filter(const ParameterHandler& prm)
 	right_length = prm.get_double(subsection, "Right length");
 }
 
-/** Build geometry object for filter geometry */
+/** \brief Build geometry object for filter geometry */
 template<int dim>
 void 
 Filter<dim>::build_geometry(Geometry<dim>& geo) const
@@ -642,7 +653,7 @@ Filter<dim>::build_geometry(Geometry<dim>& geo) const
 		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
 }
 
-/** Build mesh for filter geometry */
+/** \brief Build mesh for filter geometry */
 /** @todo make this for 2D only, the 3D version then builds a 2D grid base calling
 * this method and extrudes to the final 3D triangulation
 */
@@ -1051,6 +1062,7 @@ Mixer<dim>::add_mixer_ends(Triangulation<dim>& center,
 // -------------------------------------------------------------------------------
 // 		SPLITTER:
 // -------------------------------------------------------------------------------
+/** \brief Splitter class to construct splitter geometry and grid */
 template<int dim>
 class Splitter : public BuilderBase<dim>{
 public:
@@ -1173,6 +1185,8 @@ Splitter<dim>::printInfo(std::ostream& out) const
 
 
 // support methods:
+
+/** \brief Construct center portion of splitter grid */
 template<int dim>
 void 
 Splitter<dim>::construct_splitter_center(Triangulation<dim>& tria) const
@@ -1191,6 +1205,7 @@ Splitter<dim>::construct_splitter_center(Triangulation<dim>& tria) const
     dealii::GridTools::shift(shift_vector, tria);
 }
 
+/** \brief Add left and right ends to splitter center */
 template<int dim>
 void 
 Splitter<dim>::add_splitter_ends(Triangulation<dim>& center, 
@@ -1286,6 +1301,8 @@ Splitter<dim>::add_splitter_ends(Triangulation<dim>& center,
 // -------------------------------------------------------------------------------
 // 		HANDLING CLASS FOR GEOMETRY AND GRID CONSTRUCTION:
 // -------------------------------------------------------------------------------
+
+/** \brief Main class to build geometry and mesh */
 template<int dim>
 class GeometryBuilder{
 public:
@@ -1302,7 +1319,7 @@ private:
 
 // IMPL
 // --------------------------------------------------------------------
-/** Construct appropriate building class */
+/** \brief Constuctor: Construct appropriate building class */
 template<int dim>
 GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 {
@@ -1325,7 +1342,7 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 		throw std::runtime_error("Invalid geometry type: <" + geometry_type + ">");
 }
 
-/** Declare all parameters for all builder classes*/
+/** \brief Declare all parameters for all builder classes */
 template<int dim>
 void 
 GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
@@ -1343,11 +1360,12 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Box<dim>::declare_parameters(prm);  
 	Filter<dim>::declare_parameters(prm);
 	Mixer<dim>::declare_parameters(prm);
+	Splitter<dim>::declare_parameters(prm);
 	// Cylinder<dim>::declare_parameters(prm);
 }
 
 // Main Methods:
-/** Build geometry */
+/** \brief Build geometry */
 template<int dim>
 void 
 GeometryBuilder<dim>::build_geometry(Geometry<dim>& geo) const
@@ -1355,7 +1373,7 @@ GeometryBuilder<dim>::build_geometry(Geometry<dim>& geo) const
 	builder->build_geometry(geo);
 }
 
-/** Build grid */
+/** \brief Build grid */
 template<int dim>
 void 
 GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& tria) const
@@ -1379,7 +1397,7 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	builder->refine_boundary(geo, tria);
 }
 
-/** Display builder (geometry type) info */
+/** \brief Display builder (geometry type) info */
 template<int dim>
 void 
 GeometryBuilder<dim>::printInfo(std::ostream& out) const
