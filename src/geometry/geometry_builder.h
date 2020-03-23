@@ -30,43 +30,83 @@
 // VORTEX AND CYLINDER
 // SWISS CHEESE
 
-namespace MicrobeSimulator{ namespace GeometryTools{
+namespace MicrobeSimulator{ 
 
-// mesh tools: ...
-// declare mesh parameters ???
-// template<int dim>
-// void output_grid(const std::string& output_directory, 
-//         const std::string& file_name,
-//         const Triangulation<dim>& triangulation)
-// {
-//   std::string grid_out_file = output_directory + "/" + file_name + ".eps";
+// NAMESPACE GRIDGENERATIONTOOLS
+// --------------------------------------------------------------------------------------
+/** \brief Grid generation namespace */
+/** Set of functions to aid mesh grid generation */
+namespace GridGenerationTools{
+using dealii::Triangulation;
 
-//   std::ofstream out (grid_out_file);
-//   dealii::GridOut grid_out;
-//   grid_out.write_eps (triangulation, out);
-//   std::cout << "...Grid written to " << grid_out_file << std::endl;
-// }
+  	/** \brief Output grid to eps file */
+	template<int dim>
+	void output_grid(const std::string& output_directory, 
+	      const std::string& file_name, 
+	      const Triangulation<dim>& triangulation)
+	{
+		std::string grid_out_file = output_directory + "/" + file_name + ".eps";
 
-// /** \brief Declares parameters needed for mesh generation to be read from configuration file
-// */
-// void declare_parameters(ParameterHandler& prm)
-// {
-//   prm.enter_subsection("Mesh");
-//     prm.declare_entry("Global refinement","0",Patterns::Unsigned());
-//     prm.declare_entry("Obstacle refinement","0",Patterns::Unsigned());
-//     prm.declare_entry("Boundary refinement","0",Patterns::Unsigned());
-//     prm.declare_entry("Mesh type",
-//               "Box",
-//               Patterns::Selection("Box|Filter|Mixer|File"));
-//     prm.declare_entry("Mesh file","",Patterns::Anything());
-//   prm.leave_subsection();
-// }
+		std::ofstream out (grid_out_file);
+		dealii::GridOut grid_out;
+		grid_out.write_eps (triangulation, out);
+		std::cout << "...Grid written to " << grid_out_file << std::endl;
+	}
 
+	/** \brief Declares parameters needed for mesh generation 
+	* to be read from configuration file
+	*/
+	void declare_parameters(ParameterHandler& prm)
+	{
+	  prm.enter_subsection("Mesh");
+	    prm.declare_entry("Global refinement","0",Patterns::Unsigned());
+	    prm.declare_entry("Obstacle refinement","0",Patterns::Unsigned());
+	    prm.declare_entry("Boundary refinement","0",Patterns::Unsigned());
+	  prm.leave_subsection();
+	}
+
+	// CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
+	// --------------------------------------------------------------------------------------
+	// left boundary id
+	static constexpr unsigned int id_left = 0;
+	// right boundary id
+	static constexpr unsigned int id_right = 1;
+	// top boundary id
+	static constexpr unsigned int id_top = 2;
+	// bottom boundary id
+	static constexpr unsigned int id_bottom = 3;
+
+	// For 3d, front boundary id
+	static constexpr unsigned int id_front = 4;
+	// For 3d, back boundary id
+	static constexpr unsigned int id_back = 5;
+
+	// static constexpr unsigned int id_other = 7;
+
+	// first sphere:
+	static constexpr unsigned int id_sphere_begin = 10;
+
+	// first rectangle:
+	static constexpr unsigned int id_rectangle_begin = 100;
+
+	// arrays for dimension independent access:
+	static constexpr std::array< unsigned int , 3 > lower_ids = {id_left, id_bottom, id_back};
+	static constexpr std::array< unsigned int , 3 > upper_ids = {id_right, id_top, id_front};
+} // NAMESPACE GRIDGENERATIONTOOLS
+
+
+
+// NAMESPACE GEOMETRYTOOLS
+// --------------------------------------------------------------------------------------
+/** \brief Namespace for geometry builder and its classes */
+/** Classes to construct various geometries and meshes */
+namespace GeometryTools{
 
 /** \brief Base class for building geometry objects and meshes */
-/** Creates a local copy of geometry to create grid. 
-* Maybe this should also be intialized in constructor ...
-* also 
+/** This is a pure virtual class. Implemented default methods are given for setting boundary
+* labels, manifolds, and grid refinement. These are mainly common to all constructions, 
+* but are set as virtual if they need to be overridden. 
+* Derived classes then specialize in creating specific geometries.
 */
 template<int dim>
 class BuilderBase{
@@ -98,13 +138,9 @@ public:
 	void printMeshInfo(std::ostream& out);
 
 protected:
-	// mesh parameters*** & boundary conditions
 	unsigned int global_refinement;
 	unsigned int obstacle_refinement;
 	unsigned int boundary_refinement;
-
-	std::array<BoundaryCondition, dim> boundary_conditions; // read in from prm
-			// but not always, eg filter is fixed
 };
 
 // IMPL
@@ -117,12 +153,9 @@ BuilderBase<dim>::BuilderBase(const ParameterHandler& prm)
 	global_refinement = prm.get_unsigned(section, "Global refinement");
 	obstacle_refinement = prm.get_unsigned(section, "Obstacle refinement");
 	boundary_refinement = prm.get_unsigned(section, "Boundary refinement");
-
-	// default to periodic boundaries // will be overridden based on geometry type?
-	for(unsigned int i = 0; i < dim; ++i)
-		boundary_conditions[i] = BoundaryCondition::WRAP;
 }
 
+/** \brief Set boundary labels for outer faces */
 template<int dim>
 void 
 BuilderBase<dim>::set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria)
@@ -146,6 +179,7 @@ BuilderBase<dim>::set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<
 						cell->face(f)->set_boundary_id(GridGenerationTools::upper_ids[dim_itr]);
 } // set_edge_boundary_ids()
 
+/** \brief Set boundary labels for interior spheres */
 template<int dim>
 void 
 BuilderBase<dim>::set_sphere_boundary_ids(const Geometry<dim>& geo, 
@@ -183,6 +217,7 @@ BuilderBase<dim>::set_sphere_boundary_ids(const Geometry<dim>& geo,
 	} // for cells
 } // set_sphere_boundary_ids()
 
+/** \brief Set boundary labels for interior rectangles */
 template<int dim>
 void 
 BuilderBase<dim>::set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria)
@@ -216,6 +251,13 @@ BuilderBase<dim>::set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangula
 	} // for cells
 } // set rectangle boundary ids
 
+/** \brief Attach manifolds to interior spheres */
+/** Manifolds help ensure grid refinement adds verticies in correct locations.
+* If refining a sphere, rather than adding a new vertex in midpoint of an edge,
+* the point should be added to the midpoint of the arc of the sphere. Deal.II manifolds
+* help ensure this is done properly. See the Deal.II documentation on 
+* "Manifold description for triangulations" for more information.
+*/ 
 template<int dim>
 void 
 BuilderBase<dim>::attach_mesh_manifolds(const Geometry<dim>& geo, Triangulation<dim>& tria)
@@ -235,6 +277,7 @@ BuilderBase<dim>::attach_mesh_manifolds(const Geometry<dim>& geo, Triangulation<
 	}
 }
 
+/** \brief Globally refine mesh */
 template<int dim>
 void 
 BuilderBase<dim>::refine_global(Triangulation<dim>& tria)
@@ -360,6 +403,8 @@ public:
 private:
 	Point<dim> lower;
 	Point<dim> upper;
+
+	std::array<BoundaryCondition, dim> boundary_conditions; 
 };
 
 // IMPL
@@ -382,7 +427,7 @@ Box<dim>::Box(const ParameterHandler& prm)
 		lower[i] = b[i];
 		upper[i] = u[i];
 
-		this->boundary_conditions[i] = stringToBoundaryCondition(bcs[i]);
+		boundary_conditions[i] = stringToBoundaryCondition(bcs[i]);
 	}
 }
 
@@ -422,7 +467,6 @@ template<int dim>
 void 
 Box<dim>::build_geometry(Geometry<dim>& geo) const
 {
-	// maybe make builder a friend? if possible
 	geo.setBottomLeftPoint(lower);
 	geo.setTopRightPoint(upper);
 	geo.setBoundaryConditions(this->boundary_conditions);
@@ -453,7 +497,6 @@ Box<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tr
 	std::cout << "...generating hyper rectangle" << std::endl;
 	dealii::GridGenerator::subdivided_hyper_rectangle(tria, repetitions, lower, upper,
 			                                        /*colorize*/ false); // relabeling anyways
-	/** @todo need to make sure grids are labeled and manifolds set */
 }
 
 template<int dim>
@@ -467,6 +510,8 @@ Box<dim>::printInfo(std::ostream& out) const
 		<< "Top right: " << upper << std::endl
 		<< Utility::short_line << std::endl << std::endl;
 }
+
+
 
 // -------------------------------------------------------------------------------
 // 		FILTER:
@@ -547,8 +592,6 @@ template<int dim>
 void 
 Filter<dim>::build_geometry(Geometry<dim>& geo) const
 {
-	error, check boundaries;
-	
 	if(dim != 2)
 		throw std::runtime_error("filter geometry currently only implemented for dim == 2");
 
@@ -586,9 +629,21 @@ Filter<dim>::build_geometry(Geometry<dim>& geo) const
 		y_bottom += (channel_thickness + wall_thickness);
 		y_top += (channel_thickness + wall_thickness);
 	}
+
+	/** @todo or should we use base?
+	* 	geo.setBoundaryConditions(this->boundary_conditions);
+	*/
+
+	// SET PROPER BOUNDARY CONDITIONS FOR FILTER:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
 }
 
 /** Build mesh for filter geometry */
+/** @todo make this for 2D only, the 3D version then builds a 2D grid base calling
+* this method and extrudes to the final 3D triangulation
+*/
 template<int dim>
 void 
 Filter<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
@@ -643,6 +698,9 @@ Filter<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>&
 	dealii::GridGenerator::merge_triangulations(filter_side, tria, tria);
 } // build_mesh_base -- FILTER
 
+/** \brief Supports filter grid constuction. Builds left and right sides to which
+* channels are attached
+*/
 template<>
 void 
 Filter<2>::construct_filter_side(const double width,
@@ -656,6 +714,9 @@ Filter<2>::construct_filter_side(const double width,
                                                     Point<2>(width,height));
 }
 
+/** \brief Supports filter grid construction. Attaches channels to left side
+* constucted by constuct_filter_side()
+*/
 template<>
 void 
 Filter<2>::attach_filter_channels(Triangulation<2>& left_side) const
@@ -683,7 +744,7 @@ Filter<2>::attach_filter_channels(Triangulation<2>& left_side) const
 }
 
 
-/** Output information for filter class */
+/** \brief Output information for filter class */
 template<int dim>
 void 
 Filter<dim>::printInfo(std::ostream& out) const
@@ -704,6 +765,9 @@ Filter<dim>::printInfo(std::ostream& out) const
 // 		MIXER:
 // -------------------------------------------------------------------------------
 /** \brief Class to construct Mixer type geometry */
+/** @todo Add ability to extrude to 3D. Will require geometry bc handling
+* against cyllinders for microbes...
+*/
 template<int dim>
 class Mixer : public BuilderBase<dim>{
 public:
@@ -766,6 +830,40 @@ void
 Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 {
 
+// template<int dim>
+// void 
+// Geometry<dim>::create_mixer_geometry(double left_length,
+//                                double right_length,
+//                                double height,
+//                                double radius)
+// {
+// if(dim != 2)
+//  throw std::invalid_argument("Mixer only implemented for dim == 2");
+
+// std::cout << "\n\t CREATE MIXER GEOMETRY:" << std::endl
+//  << "left_length = " << left_length << std::endl
+//  << "right_length = " << right_length << std::endl
+//  << "height = " << height << std::endl
+//  << "radius = " << radius << std::endl; 
+
+// if(height < 2.*radius)
+//  throw std::invalid_argument("Mixer height must be greater than sphere diameter");
+
+// const double width = left_length + 2.*radius + right_length;
+
+// for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+//  bottom_left[dim_itr] = 0;
+
+// top_right[0] = width;
+// top_right[1] = height;
+
+// // add spheres:
+// const double center_x = left_length + radius;
+// spheres.push_back(Sphere<2>(Point<2>(center_x, 0.) ,radius));
+// spheres.push_back(Sphere<2>(Point<2>(center_x, height) ,radius));
+// }
+
+
 }
 
 template<int dim>
@@ -793,6 +891,80 @@ Mixer<dim>::printInfo(std::ostream& out) const
 // -------------------------------------------------------------------------------
 // 		SPLITTER:
 // -------------------------------------------------------------------------------
+// template<int dim>
+// class Splitter : public BuilderBase<dim>{
+// public:
+// 	// constructor
+// 	Splitter(const ParameterHandler& prm);
+
+// 	// class parameters:
+// 	static void declare_parameters(ParameterHandler& prm);
+
+// 	// override virtual methods:
+// 	void build_geometry(Geometry<dim>& geo) const override; 
+// 	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+// 	void printInfo(std::ostream& out) const override;
+// private:
+// 	double height;
+// 	double left;
+// 	double right;
+// 	double radius;
+
+// 	// support methods:
+// 	void construct_filter_side(const double width,
+//                           const double height,
+//                           const std::vector< std::vector< double > > &  step_sizes,
+//                           Triangulation<2>& filter_side) const;
+// 		// THIS DOESNT NEED TO BE A MEMBER FUNCTION...
+
+// 	void attach_filter_channels(Triangulation<dim>& left_side) const;
+
+// 	// extrusion to 3D:
+// 	// void extrude(Triangulation<dim>& filter_twodim);
+// };
+
+
+
+// template<int dim>
+// void 
+// Geometry<dim>::create_splitter_geometry(double left_length,
+//                      double right_length,
+//                      double height,
+//                      double radius)
+// {
+// // if(dim != 2)
+// //   throw std::invalid_argument("Mixer only implemented for dim == 2");
+
+// std::cout << "\n\t CREATE SPLITTER GEOMETRY:" << std::endl
+//  << "left_length = " << left_length << std::endl
+//  << "right_length = " << right_length << std::endl
+//  << "height = " << height << std::endl
+//  << "radius = " << radius << std::endl; 
+
+// const double width = left_length + 2.*radius + right_length;
+
+// for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+//  bottom_left[dim_itr] = 0;
+
+// top_right[0] = width;
+// top_right[1] = height;
+
+// // add spheres:
+// const double center_x = left_length + radius;
+// const double center_y = 0.5*height;
+// spheres.push_back(Sphere<2>(Point<2>(center_x, center_y) ,radius));
+// }
+
+// 	void printInfo(std::ostream& out)
+// 	{
+// 		out << "SPLITTER: " << std::endl
+// 			<< "Height: " << height << std::endl
+// 			<< "Left length: " << left << std::endl
+// 			<< "Right length: " << right << std::endl
+// 			<< "Radius: " << radius << std::endl;
+// 	}
+
+
 
 
 // -------------------------------------------------------------------------------
@@ -878,8 +1050,6 @@ template<int dim>
 void 
 GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 {
-	// declare mesh parameters ??? GridGenerationTools::declare_parameters(prm);
-
 	prm.enter_subsection("Geometry");
 		prm.declare_entry("Geometry type",
 		          "Box",
@@ -889,7 +1059,8 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 		          "provided in the \"Geometry file\" parameter. ");
 	prm.leave_subsection();
 
-	Box<dim>::declare_parameters(prm);  // thess are not subsubsections ...***
+	GridGenerationTools::declare_parameters(prm); 
+	Box<dim>::declare_parameters(prm);  
 	Filter<dim>::declare_parameters(prm);
 	Mixer<dim>::declare_parameters(prm);
 	// Cylinder<dim>::declare_parameters(prm);
