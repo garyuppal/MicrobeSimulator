@@ -123,8 +123,7 @@ public:
 	// mesh construction support methods:
 	// boundary labels:
 	virtual void set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
-	virtual void set_sphere_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria,
-                            double sphere_tolerance);
+	virtual void set_sphere_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
 	virtual void set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
 
 	// manifolds:
@@ -141,6 +140,8 @@ protected:
 	unsigned int global_refinement;
 	unsigned int obstacle_refinement;
 	unsigned int boundary_refinement;
+
+	double sphere_tolerance;
 };
 
 // IMPL
@@ -148,6 +149,8 @@ protected:
 // mesh construction support methods:
 template<int dim>
 BuilderBase<dim>::BuilderBase(const ParameterHandler& prm)
+	:
+	sphere_tolerance(-1)
 {
 	const std::string section = "Mesh";
 	global_refinement = prm.get_unsigned(section, "Global refinement");
@@ -182,8 +185,7 @@ BuilderBase<dim>::set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<
 /** \brief Set boundary labels for interior spheres */
 template<int dim>
 void 
-BuilderBase<dim>::set_sphere_boundary_ids(const Geometry<dim>& geo, 
-		Triangulation<dim>& tria, double sphere_tolerance)
+BuilderBase<dim>::set_sphere_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria)
 {
 	std::vector<Sphere<dim> > spheres = geo.getSpheres();
 
@@ -797,6 +799,7 @@ private:
 // -----------------------------------------------------------------
 
 // constructor
+/** \brief Constuctor for mixer class */
 template<int dim>
 Mixer<dim>::Mixer(const ParameterHandler& prm)
 	:
@@ -807,9 +810,13 @@ Mixer<dim>::Mixer(const ParameterHandler& prm)
 	right_length = prm.get_double(subsection, "Right length");
 	height = prm.get_double(subsection, "Height");
 	radius = prm.get_double(subsection, "Radius");
+
+	const double buffer = 0.5*height - radius;
+	this->sphere_tolerance = 0.5*buffer;
 }
 
 // class parameters:
+/** \brief Declare parameters needed for mixer */
 template<int dim>
 void 
 Mixer<dim>::declare_parameters(ParameterHandler& prm)
@@ -847,6 +854,7 @@ Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 	top_right[0] = width;
 	top_right[1] = height;
 
+	// set bounding domain:
 	geo.setBottomLeftPoint(bottom_left);
 	geo.setTopRightPoint(top_right);
 
@@ -856,6 +864,12 @@ Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 
 	geo.addSphere( Sphere<2>(Point<2>(center_x, 0.) ,radius) );
 	geo.addSphere( Sphere<2>(Point<2>(center_x, height) ,radius) );
+
+	// set boundary conditions:
+	// SET PROPER BOUNDARY CONDITIONS FOR Mixer:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
 }
 
 /** \brief Override build grid for Mixer */
@@ -887,30 +901,7 @@ Mixer<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) 
 		add_mixer_ends(center, tria);
 
 		/** @todo add here extrusion for 3D implementation */
-
-		// if(relabel == true)
-		// {
-		// 	const double total_width = left_length + right_length + 2.*radius;
-		// 	std::vector<Sphere<2> > spheres;
-
-		// 	// bottom sphere:
-		// 	spheres.push_back(Sphere<2>( Point<2>( left_length + radius, 0), radius));
-		// 	// top sphere:
-		// 	spheres.push_back(Sphere<2>( Point<2>(  left_length + radius, height ), radius));
-
-		// 	// set_boundary_ids(Point<dim>(0,0), Point<dim>(total_width,height), spheres, tria);
-		// 	set_edge_boundary_ids(Point<2>(0,0), Point<2>(total_width,height), tria);
-		// 	set_sphere_boundary_ids(spheres, tria);
-
-		// 	attach_mesh_manifolds(spheres, tria);
-		// }
-
-		// return buffer;
-
-/** @todo double check labeling and manifolds !!!!!!!!!! */
-	// set_boundary_and_manifolds(geo, tria, 0.5*buffer);
 }  
-
 
 /** \brief Output mixer info */
 template<int dim>
@@ -1060,78 +1051,122 @@ Mixer<dim>::add_mixer_ends(Triangulation<dim>& center,
 // -------------------------------------------------------------------------------
 // 		SPLITTER:
 // -------------------------------------------------------------------------------
-// template<int dim>
-// class Splitter : public BuilderBase<dim>{
-// public:
-// 	// constructor
-// 	Splitter(const ParameterHandler& prm);
+template<int dim>
+class Splitter : public BuilderBase<dim>{
+public:
+	// constructor
+	Splitter(const ParameterHandler& prm);
 
-// 	// class parameters:
-// 	static void declare_parameters(ParameterHandler& prm);
+	// class parameters:
+	static void declare_parameters(ParameterHandler& prm);
 
-// 	// override virtual methods:
-// 	void build_geometry(Geometry<dim>& geo) const override; 
-// 	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
-// 	void printInfo(std::ostream& out) const override;
-// private:
-// 	double height;
-// 	double left;
-// 	double right;
-// 	double radius;
+	// override virtual methods:
+	void build_geometry(Geometry<dim>& geo) const override; 
+	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+	void printInfo(std::ostream& out) const override;
+private:
+	double height;
+	double left;
+	double right;
+	double radius;
+};
 
-// 	// support methods:
-// 	void construct_filter_side(const double width,
-//                           const double height,
-//                           const std::vector< std::vector< double > > &  step_sizes,
-//                           Triangulation<2>& filter_side) const;
-// 		// THIS DOESNT NEED TO BE A MEMBER FUNCTION...
+// IMPL
+// -------------------------------------------------------------------------
 
-// 	void attach_filter_channels(Triangulation<dim>& left_side) const;
+// constructor
+/** \brief Constuctor for Splitter class */
+template<int dim>
+Splitter<dim>::Splitter(const ParameterHandler& prm)
+	:
+	BuilderBase<dim>(prm) // gets mesh refinement parameters
+{
+	const std::string section = "Geometry.Splitter";
 
-// 	// extrusion to 3D:
-// 	// void extrude(Triangulation<dim>& filter_twodim);
-// };
+	left = prm.get_double(section, "Left length");
+	right = prm.get_double(section, "Right length");
+	height = prm.get_double(section, "Height");
+	radius = prm.get_double(section, "Radius");
+}
+
+// class parameters:
+/** \brief Declare parameters for Splitter class */
+template<int dim>
+void 
+Splitter<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Splitter");
+			prm.declare_entry("Left length","1",Patterns::Double());
+			prm.declare_entry("Right length","1",Patterns::Double());
+			prm.declare_entry("Height","1",Patterns::Double());
+			prm.declare_entry("Radius","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+// override virtual methods:
+
+/** \brief Override build geometry for Splitter */
+template<int dim>
+void 
+Splitter<dim>::build_geometry(Geometry<dim>& geo) const
+{
+	if(dim != 2)
+		throw std::invalid_argument("Splitter only implemented for dim == 2");
+
+	Point<dim> bottom_left, top_right; 
+
+	const double width = left + 2.*radius + right;
+
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+		bottom_left[dim_itr] = 0;
+
+	top_right[0] = width;
+	top_right[1] = height;
+
+	// set bounding domain:
+	geo.setBottomLeftPoint(bottom_left);
+	geo.setTopRightPoint(top_right);
+
+	// add spheres:
+	const double center_x = left + radius;
+	const double center_y = 0.5*height;
+	geo.addSphere(Sphere<2>(Point<2>(center_x, center_y) ,radius));
+
+	// SET PROPER BOUNDARY CONDITIONS FOR Splitter:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
+}
+
+/** \brief Override build mesh for splitter */
+/** Splitter mesh consists of a rectangle with a hole cut out in the center 
+*/
+template<int dim>
+void 
+Splitter<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+{
+	/** @todo ...still need to implement */
+}
+
+/** \brief Display info for Splitter object */
+template<int dim>
+void 
+Splitter<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\tSplitter:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Height: " << height << std::endl
+		<< "Left length: " << left << std::endl
+		<< "Right length: " << right << std::endl
+		<< "Radius: " << radius << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
 
 
 
-// template<int dim>
-// void 
-// Geometry<dim>::create_splitter_geometry(double left_length,
-//                      double right_length,
-//                      double height,
-//                      double radius)
-// {
-// // if(dim != 2)
-// //   throw std::invalid_argument("Mixer only implemented for dim == 2");
-
-// std::cout << "\n\t CREATE SPLITTER GEOMETRY:" << std::endl
-//  << "left_length = " << left_length << std::endl
-//  << "right_length = " << right_length << std::endl
-//  << "height = " << height << std::endl
-//  << "radius = " << radius << std::endl; 
-
-// const double width = left_length + 2.*radius + right_length;
-
-// for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
-//  bottom_left[dim_itr] = 0;
-
-// top_right[0] = width;
-// top_right[1] = height;
-
-// // add spheres:
-// const double center_x = left_length + radius;
-// const double center_y = 0.5*height;
-// spheres.push_back(Sphere<2>(Point<2>(center_x, center_y) ,radius));
-// }
-
-// 	void printInfo(std::ostream& out)
-// 	{
-// 		out << "SPLITTER: " << std::endl
-// 			<< "Height: " << height << std::endl
-// 			<< "Left length: " << left << std::endl
-// 			<< "Right length: " << right << std::endl
-// 			<< "Radius: " << radius << std::endl;
-// 	}
 
 
 
@@ -1249,14 +1284,14 @@ template<int dim>
 void 
 GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& tria) const
 {
-	const int sphere_tolerance = -1; // may need to vary based on geometry type
+	// const int sphere_tolerance = -1; // may need to vary based on geometry type
 
 	// build grid:
 	builder->build_grid_base(geo, tria);
 
 	// set boundary labels:
 	builder->set_edge_boundary_ids(geo, tria);
-	builder->set_sphere_boundary_ids(geo, tria, sphere_tolerance); 
+	builder->set_sphere_boundary_ids(geo, tria); 
 	builder->set_rectangle_boundary_ids(geo, tria); 
 
 	// attach manifolds:
