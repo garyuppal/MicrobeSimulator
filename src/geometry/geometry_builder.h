@@ -788,9 +788,9 @@ private:
 	double radius;
 
 	// support methods:
-	// void constuct_mixer_center(Triangulation<dim>& tria);
-	// void generate_half_circle_hole_tile(Triangulation<dim>& tile);
-	// void add_mixer_ends(Triangulation<dim>& center, Triangulation<dim>& tria);
+	void construct_mixer_center(Triangulation<dim>& tria);
+	void generate_half_circle_hole_tile(Triangulation<dim>& tile);
+	void add_mixer_ends(Triangulation<dim>& center, Triangulation<dim>& tria);
 };
 
 // IMPL
@@ -825,6 +825,8 @@ Mixer<dim>::declare_parameters(ParameterHandler& prm)
 }
 
 // override virtual methods:
+
+/** \brief Override build geometry for Mixer */
 template<int dim>
 void 
 Mixer<dim>::build_geometry(Geometry<dim>& geo) const
@@ -866,13 +868,61 @@ Mixer<dim>::build_geometry(Geometry<dim>& geo) const
 
 }
 
+/** \brief Override build grid for Mixer */
+/** @todo add option to extrude to 3D */
 template<int dim>
 void 
 Mixer<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
 {
+	/** @todo Change if...throw 's to assertions */
+	if(geo.getNumberSpheres() != 2)
+		throw std::runtime_error("Geometry should have two spheres for mixer mesh");
+	if(geo.getSphereAt(0).getCenter()[0] != geo.getSphereAt(1).getCenter()[0])
+		throw std::runtime_error("Two spheres should have same x-coordinate for mixer mesh");
 
-}  // add option to extrude to 3D
+	// bottom left point should be at origin
+	if(geo.getBottomLeftPoint()[0] != 0 || geo.getBottomLeftPoint()[1] != 0)
+		throw std::runtime_error("Bottom left corner for mixer mesh should be located at the origin");
 
+	if(right_length < 0)
+		std::runtime_error("Top right point should be located to the right of sphere for mixer mesh");
+
+	// const double buffer = build_mixer_mesh(left_length, right_length, height, radius, tria);
+	// :::::
+		if(height < (2.*radius) )
+			throw std::invalid_argument("Mixer height must be larger than diameter");
+
+		Triangulation<2> center;
+		construct_mixer_center(center); 
+		add_mixer_ends(center, tria);
+
+		/** @todo add here extrusion for 3D implementation */
+
+		// if(relabel == true)
+		// {
+		// 	const double total_width = left_length + right_length + 2.*radius;
+		// 	std::vector<Sphere<2> > spheres;
+
+		// 	// bottom sphere:
+		// 	spheres.push_back(Sphere<2>( Point<2>( left_length + radius, 0), radius));
+		// 	// top sphere:
+		// 	spheres.push_back(Sphere<2>( Point<2>(  left_length + radius, height ), radius));
+
+		// 	// set_boundary_ids(Point<dim>(0,0), Point<dim>(total_width,height), spheres, tria);
+		// 	set_edge_boundary_ids(Point<2>(0,0), Point<2>(total_width,height), tria);
+		// 	set_sphere_boundary_ids(spheres, tria);
+
+		// 	attach_mesh_manifolds(spheres, tria);
+		// }
+
+		// return buffer;
+
+/** @todo double check labeling and manifolds !!!!!!!!!! */
+	// set_boundary_and_manifolds(geo, tria, 0.5*buffer);
+}  
+
+
+/** \brief Output mixer info */
 template<int dim>
 void 
 Mixer<dim>::printInfo(std::ostream& out) const
@@ -886,6 +936,135 @@ Mixer<dim>::printInfo(std::ostream& out) const
 		<< "Radius: " << radius << std::endl
 		<< Utility::short_line << std::endl << std::endl;
 }
+
+
+// Mesh constuction support methods:
+
+/** \brief Constuct center portion of mixer mesh */
+template<int dim>
+void 
+Mixer<dim>::construct_mixer_center(Triangulation<dim>& center)
+{
+	generate_half_circle_hole_tile(center); // generated with corner at origin
+
+	Triangulation<dim> auxillary;
+	auxillary.copy_triangulation(center);
+
+	const double angle = 0.5*dealii::numbers::PI;
+	dealii::GridTools::rotate(angle,auxillary); // bottom
+	dealii::GridTools::rotate(-angle,center);  // top
+
+	Tensor<1,dim> shift_vector;
+	shift_vector[0] = height;
+	shift_vector[1] = 0;
+	// move bottom left corner back to origin
+	dealii::GridTools::shift(shift_vector,auxillary);
+
+	shift_vector[0] = 0;
+	shift_vector[1] = height;
+	// move above bottom tile
+	dealii::GridTools::shift(shift_vector,center);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(auxillary,center,center);
+}
+
+/** \brief Constuct tile with semicircle removed to use in cetner portion of 
+* mixer mesh 
+*/
+template<int dim>
+void 
+Mixer<dim>::generate_half_circle_hole_tile(Triangulation<dim>& hole_tile)
+{
+	if(dim != 2)
+		throw std::runtime_error("Function not implemented for dim != 2");
+
+	hole_tile.clear();
+
+	const double outer_radius = 0.5*height;
+
+	dealii::GridGenerator::hyper_cube_with_cylindrical_hole(hole_tile,
+					                                        radius,
+					                                        outer_radius);
+
+	// shift so corner at origin:
+	Tensor<1,dim> shift_vector;
+	shift_vector[0] = outer_radius;
+	shift_vector[1] = outer_radius;
+	dealii::GridTools::shift(shift_vector,hole_tile);
+
+	// find cells to remove:
+	std::set< typename Triangulation<dim>::active_cell_iterator > cells_to_remove;
+
+	for (const auto cell : hole_tile.active_cell_iterators())
+		if (cell->center()[0] < outer_radius)
+			cells_to_remove.insert(cell);
+
+	// remove LHS:
+	dealii::GridGenerator::create_triangulation_with_removed_cells(hole_tile,
+					                                              cells_to_remove,
+					                                              hole_tile);
+	// shift new corner to origin
+	shift_vector[0] = -outer_radius;
+	shift_vector[1] = 0;
+	dealii::GridTools::shift(shift_vector,hole_tile);
+}
+
+/** \brief Add left and right sides to mixer center */
+template<int dim>
+void 
+Mixer<dim>::add_mixer_ends(Triangulation<dim>& center,
+		                Triangulation<dim>& tria)
+{
+	// center tile will be a `buffer' length wider than radius
+	// we adjust left and right lengths accordingly to get desired lengths
+	const double buffer = 0.5*height - radius;
+	const double left_width = left_length - buffer;
+	const double right_width = right_length - buffer;
+
+	// assert modified lengths are positive:
+	assert(left_width>0);
+	assert(right_width>0);
+
+	Triangulation<dim> side_tile;
+
+	std::vector<unsigned int> repetitions(dim,2);
+
+	repetitions[0] = 1 + std::floor(left_width/height);
+
+	// for dim == 2 -- can extrude this tile for dim == 3 :
+	dealii::GridGenerator::subdivided_hyper_rectangle(side_tile,
+	                                                repetitions,
+	                                                Point<2>(0,0),
+	                                                Point<2>(left_width,height));
+
+	// shift center and merge:
+	Tensor<1,2> shift_vector;
+	shift_vector[0] = left_width;
+	shift_vector[1] = 0.;
+
+	dealii::GridTools::shift(shift_vector, center);
+	dealii::GridGenerator::merge_triangulations(side_tile,center,tria);
+
+	// generate RIGHT side:
+	side_tile.clear();
+
+	repetitions[0] = 1 + std::floor(right_width/height);
+
+	// for dim == 2 -- can extrude this tile for dim == 3 :
+	dealii::GridGenerator::subdivided_hyper_rectangle(side_tile,
+	                                                repetitions,
+	                                                Point<2>(0,0),
+	                                                Point<2>(right_width,height));
+
+	shift_vector[0] = left_width + height; // center width = height
+	dealii::GridTools::shift(shift_vector, side_tile);
+
+	// final merge:
+	dealii::GridGenerator::merge_triangulations(side_tile,tria,tria);
+}
+
+
 
 
 // -------------------------------------------------------------------------------
