@@ -444,13 +444,15 @@ template<>
 void 
 Box<2>::declare_parameters(ParameterHandler& prm)
 {
-	prm.enter_subsection("Box");
-		prm.declare_entry("Bottom left","{0,0}",Patterns::List(Patterns::Double()));
-		prm.declare_entry("Top right","{0,0}",Patterns::List(Patterns::Double()));
-		prm.declare_entry("Boundary conditions",
-		          "{WRAP,WRAP}",
-		          Patterns::List(Patterns::Selection("WRAP|REFLECT|OPEN")),
-		          "Boundary conditions.");
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Box");
+			prm.declare_entry("Bottom left","{0,0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Top right","{0,0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Boundary conditions",
+			          "{WRAP,WRAP}",
+			          Patterns::List(Patterns::Selection("WRAP|REFLECT|OPEN")),
+			          "Boundary conditions.");
+		prm.leave_subsection();
 	prm.leave_subsection();
 }
 
