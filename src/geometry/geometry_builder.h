@@ -1335,7 +1335,7 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	else if( boost::iequals(geometry_type, "Box") )
 		builder = std::make_shared<Box<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Splitter") )
-		std::cout << "Need to implement" << std::endl;
+		builder = std::make_shared<Splitter<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Cylinder") ) // 2d gives vortex
 		std::cout << "Need to implement" << std::endl;
 	else if( boost::iequals(geometry_type, "File") )
