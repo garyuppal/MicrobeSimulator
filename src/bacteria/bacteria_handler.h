@@ -1,5 +1,5 @@
-#ifndef MICROBE_SIMULATOR_BACTERIA_HANDLER_2_H
-#define MICROBE_SIMULATOR_BACTERIA_HANDLER_2_H
+#ifndef MICROBE_SIMULATOR_BACTERIA_HANDLER_H
+#define MICROBE_SIMULATOR_BACTERIA_HANDLER_H
 
 #include "./bacterium_types.h"
 #include "./bacteria_fitness.h"
@@ -61,8 +61,7 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 }
 
 
-/** \brief Bacteria handler class
-*/
+/** \brief Bacteria handler class */
 template<int dim>
 class BacteriaHandler{
 public:
@@ -118,10 +117,13 @@ private:
 
 // IMPL
 // ----------------------------------------------------------------
+
+/** \brief Constructor for BacteriaHandler */
 template<int dim>
 BacteriaHandler<dim>::BacteriaHandler()
 {}
 
+/** \brief Declare parameters needed to constuct bacteria */
 template<int dim>
 void
 BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
@@ -149,6 +151,8 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 	prm.leave_subsection();
 }
 
+/** \brief Initialization of bacteria from system parameters and bounding geometry */
+/** Note geometry should be constructed before initializing bacteria */
 template<int dim>
 void 
 BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo)
@@ -160,6 +164,7 @@ BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo
 	add_bacteria(prm,geo);
 } 
 
+/** \brief Method to introduce new bacteria groups during a simulation */
 template<int dim>
 void
 BacteriaHandler<dim>::reintro(const ParameterHandler& prm, const Geometry<dim>& geo)
@@ -167,6 +172,7 @@ BacteriaHandler<dim>::reintro(const ParameterHandler& prm, const Geometry<dim>& 
 	add_bacteria(prm,geo);
 }
 
+/** \brief Method to support adding bacteria to handler class. Called by init() and reintro() methods. */
 template<int dim>
 void
 BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo)
@@ -198,6 +204,11 @@ BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<d
 	}	
 }
 
+/** \brief Construct ordinary type bacteria from given parameters. */
+/** init() is often used instead of this method to construct from
+* parameter handler and domain geometry
+* @todo remove this method?
+*/
 template<int dim>
 void
 BacteriaHandler<dim>::init_reg(double db, 
@@ -216,17 +227,16 @@ BacteriaHandler<dim>::init_reg(double db,
 		bacteria.emplace_back(new BacteriumBase<dim>(location,rates) );
 }
 
+/** \brief */
 template<int dim>
 void 
 BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
 			const Velocity::AdvectionHandler<dim>& velocity,
 			double buffer)
 {
-	// std::cout << "doing random walk" << std::endl;
 	for(unsigned int i = 0; i < bacteria.size(); ++i)
 		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity, buffer);
 
-	// if boundary is open, remove fallen bacteria:
 	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
 		remove_fallen_bacteria(geometry.getTopRightPoint()[0]);	
 }

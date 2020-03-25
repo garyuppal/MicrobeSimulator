@@ -4,22 +4,12 @@
 #include <deal.II/grid/tria.h>
 using dealii::Triangulation;
 
-// Simulator components:
-// #include "../bacteria/bacteria.h"
-#include "../bacteria/bacteria_handler2.h" // temp name
+#include "../bacteria/bacteria_handler.h" 
 #include "../bacteria/bacteria_fitness.h"
-
-
 #include "../chemicals/chemical_handler.h"
 #include "../advection/advection_handler.h"
 #include "../geometry/geometry.h"
-#include "../geometry/geometry_builder.h" // rename to tools ***
-
-// TOOLS:
-// #include "../utility/argparser.h"
-// #include "../geometry/grid_generation_tools.h" // can include  a parameter declaration function here
-// #include "./simulation_tools.h"
-
+#include "../geometry/geometry_builder.h" 
 #include "../utility/parameter_handler.h"
 #include "../utility/command_line_parser.h"
 
@@ -31,7 +21,6 @@ using dealii::Triangulation;
 * \brief Simulator file
 * Simulation class defined here
 */
-
 
 namespace MicrobeSimulator{
 
@@ -49,6 +38,36 @@ namespace MicrobeSimulator{
 		}
 	} // close SimulationTools namespace
 
+	/** \brief Test function to debug chemicals */
+	namespace TestFunction{
+		template<int dim>
+		class Gaussian : public dealii::Function<dim>{
+		public:
+			Gaussian(const Point<dim>& c, double a, double w);
+			double value(const Point<dim>& p,
+				const unsigned int component = 0) const override;
+		private:
+			Point<dim> center;
+			double amplitude;
+			double width;
+		};
+
+		template<int dim>
+		Gaussian<dim>::Gaussian(const Point<dim>& c, double a, double w)
+			:
+			center(c), amplitude(a), width(w)
+		{}
+
+		template<int dim>
+		double
+		Gaussian<dim>::value(const Point<dim>& p,
+				const unsigned int /* component */) const
+		{
+			return amplitude*std::exp( -(p-center)*(p-center)/width );
+		}
+	} // close namespace
+
+
 /** \brief Simulator class
 * This class handles reading in parameters, constructing, and executing the simulation.
 */
@@ -57,7 +76,6 @@ class FullSimulator{
 public:
 	FullSimulator(const CommandLineParameters& cmd_prm);
 	void run();
-	// void run_cycles(); // don't need this, just reintro
 
 	void function_test();
 	void test_chemical_flow();
@@ -93,8 +111,8 @@ private:
 
 	// for adding in new groups:
 	unsigned int 										number_reintroduced;
-
-	double edge_buffer;
+	// buffer against interior boundaries for random walk:
+	double 												edge_buffer;
 
 	// output:
 	void output_bacteria() const;
@@ -106,55 +124,25 @@ private:
 
 	// setup:
 	void declare_parameters();
-	void setup_system(); // can even move this outside of this class,
+	void setup_system(); 
 	void assign_local_parameters();
 	void setup_time_steps();
 	double get_chemical_time_step();
 	void setup_fitness();
-	// then can get dimension and simulation type in advance
 
 	// Simulators:
 	void run_microbes();
-
 };
-
-namespace TestFunction{
-	template<int dim>
-	class Gaussian : public dealii::Function<dim>{
-	public:
-		Gaussian(const Point<dim>& c, double a, double w);
-		double value(const Point<dim>& p,
-			const unsigned int component = 0) const override;
-	private:
-		Point<dim> center;
-		double amplitude;
-		double width;
-	};
-
-	template<int dim>
-	Gaussian<dim>::Gaussian(const Point<dim>& c, double a, double w)
-		:
-		center(c), amplitude(a), width(w)
-	{}
-
-	template<int dim>
-	double
-	Gaussian<dim>::value(const Point<dim>& p,
-			const unsigned int /* component */) const
-	{
-		return amplitude*std::exp( -(p-center)*(p-center)/width );
-	}
-} // close namespace
 
 // IMPL
 // -----------------------------------------------------------------
+
+/** \brief Construct simulator */
 template<int dim>
 FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	:
 	prm(cmd_prm.getParameterFile(), cmd_prm.getJobID()),
 	triangulation(Triangulation<dim>::maximum_smoothing),
-	// chemical_fe_base(triangulation), // move into handler, can construct later in program
-	// chemical_handler(4),
 	output_directory(cmd_prm.getOutputDirectory()),
 	run_time(0),
 	time(0),
@@ -167,6 +155,7 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	edge_buffer(0)
 {}
 
+/** \brief Run simulation */
 template<int dim>
 void
 FullSimulator<dim>::run()
@@ -175,6 +164,7 @@ FullSimulator<dim>::run()
 	run_microbes();
 }
 
+/** \brief Test field with gaussian function */
 template<int dim>
 void
 FullSimulator<dim>::function_test()
@@ -206,6 +196,7 @@ FullSimulator<dim>::function_test()
 	}
 }
 
+/** \brief Run evolving microbe simulation */
 template<int dim>
 void
 FullSimulator<dim>::run_microbes()
@@ -280,8 +271,9 @@ FullSimulator<dim>::run_microbes()
 
 	if(reintro)
 		SimulationTools::output_vector(pg_rates,"pg_rates",output_directory);
-}
+} // run_microbes()
 
+/** \brief Method to reintoduce new microbe groups into simulation */
 template<int dim>
 void
 FullSimulator<dim>::reintro_bacteria()
