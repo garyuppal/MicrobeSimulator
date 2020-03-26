@@ -10,7 +10,10 @@
 #include <vector>
 #include <memory>
 
-namespace MicrobeSimulator{ namespace BacteriaNew{
+namespace MicrobeSimulator{ 
+	/** \brief Bacteria classes and methods
+	*/
+	namespace Bacteria{
 
 /** \brief Method to get valid locations in geometry domain
 *  for seeding bacteria groups
@@ -88,6 +91,7 @@ public:
 
 	// simple version for now:
 	void mutate_simple(double dt, double mutation_rate, double ds);
+	void mutate_binary(double dt, double mutation_rate, double orig_sec); 
 
 	// ACCESSORS:
 	double getDiffusionConstant() const;
@@ -138,6 +142,7 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 							Patterns::List(Patterns::Double()));
 		prm.declare_entry("Mutation rate","0",Patterns::Double());
 		prm.declare_entry("Mutation strength", "0", Patterns::Double());
+		prm.declare_entry("Binary mutation","False",Patterns::Bool());
 		prm.declare_entry("Initial number cheaters","0",Patterns::Unsigned());
 		prm.declare_entry("Deterministic number mutate","0",Patterns::Unsigned());
 		prm.declare_entry("Deterministic mutate time","0",Patterns::Double());
@@ -335,6 +340,8 @@ BacteriaHandler<dim>::reproduce(
 	// bacteria.insert(bacteria.end(), offspring.begin(), offspring.end());
 } // reproduce()
 
+/** \brief Continuous mutation */
+/** @todo Generalize to mutliple goods */
 template<int dim>
 void 
 BacteriaHandler<dim>::mutate_simple(double dt, double mutation_rate, double ds)
@@ -347,6 +354,27 @@ BacteriaHandler<dim>::mutate_simple(double dt, double mutation_rate, double ds)
 		{
 			double sec = (*it)->getSecretionRate(0) + ds*(2.0*Utility::getRand()-1.0);
 			if(sec < 0)
+				sec = 0;
+			(*it)->setSecretionRate(0, sec);
+		} // if mutating
+	} // for all bacteria
+} // mutate_simple()
+
+/** \brief Binary mutation */
+/** @todo Generalize to mutliple goods */
+template<int dim>
+void 
+BacteriaHandler<dim>::mutate_binary(double dt, double mutation_rate, double orig_sec)
+{
+	// loop through bacteria:
+	for(auto it = bacteria.begin(); it != bacteria.end(); ++it)
+	{
+		double prob = dt*Utility::getRand();
+		if(prob < mutation_rate)
+		{
+			double current_sec = (*it)->getSecretionRate(0);
+			double sec = orig_sec;
+			if(current_sec > 0)
 				sec = 0;
 			(*it)->setSecretionRate(0, sec);
 		} // if mutating

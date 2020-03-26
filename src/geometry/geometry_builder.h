@@ -554,6 +554,8 @@ private:
 	double center_length;
 	double right_length;
 
+	/** @todo option to fix total height */
+
 	// support methods:
 	void construct_filter_side(const double width,
                           const double height,

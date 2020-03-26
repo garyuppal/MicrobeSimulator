@@ -22,6 +22,7 @@ using dealii::Triangulation;
 * Simulation class defined here
 */
 
+/** \brief Main namespace for MicrobeSimulator */
 namespace MicrobeSimulator{
 
 	namespace SimulationTools{
@@ -39,6 +40,7 @@ namespace MicrobeSimulator{
 	} // close SimulationTools namespace
 
 	/** \brief Test function to debug chemicals */
+	/** @todo Move this into a separate class to test simulator */
 	namespace TestFunction{
 		template<int dim>
 		class Gaussian : public dealii::Function<dim>{
@@ -89,8 +91,8 @@ private:
 
 	Chemicals::Controls<dim>							control_functions;
 
-	BacteriaNew::BacteriaHandler<dim>					bacteria;
-	BacteriaNew::OR_Fitness<dim>						fitness_function;
+	Bacteria::BacteriaHandler<dim>					bacteria;
+	Bacteria::OR_Fitness<dim>						fitness_function;
 		// type of fitness given by parameter as well***
 
 	std::vector<double>									pg_rates;
@@ -113,6 +115,10 @@ private:
 	unsigned int 										number_reintroduced;
 	// buffer against interior boundaries for random walk:
 	double 												edge_buffer;
+
+	/** @todo move these to bacteria handler */
+	double 												original_rate;
+	bool 												binary_mutating;
 
 	// output:
 	void output_bacteria() const;
@@ -152,7 +158,9 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	time_step_number(0),
 	bacteria_time_step_multiplier(1),
 	number_reintroduced(0),
-	edge_buffer(0)
+	edge_buffer(0),
+	original_rate(0),
+	binary_mutating(false)
 {}
 
 /** \brief Run simulation */
@@ -165,6 +173,7 @@ FullSimulator<dim>::run()
 }
 
 /** \brief Test field with gaussian function */
+/** @todo Move this into a separate class to test simulator */
 template<int dim>
 void
 FullSimulator<dim>::function_test()
@@ -288,6 +297,7 @@ FullSimulator<dim>::reintro_bacteria()
 	}	
 }
 
+/** \brief Test chemical evolution */
 template<int dim>
 void
 FullSimulator<dim>::test_chemical_flow()
@@ -302,16 +312,6 @@ FullSimulator<dim>::test_chemical_flow()
 	// save period:
 	const unsigned int modsave
 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
-	// const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
-
-	// spread out intial bacteria...
-	// const unsigned int intial_spread = 15;
-	// for(unsigned int i = 0; i < intial_spread; ++i)
-	// 	bacteria.randomWalk(chemical_time_step, geometry, velocity_function);
-
-	// check after intial spread:
-	// output_bacteria();
-	// ++save_step_number;
 
 	Point<dim> c = (dim==2) ? Point<dim>(2,2) : Point<dim>(2,2,2);
 	double a = 1.0;
@@ -323,9 +323,6 @@ FullSimulator<dim>::test_chemical_flow()
 	std::vector<Point<dim> > qpoints = geometry.getQuerryPoints();
 
 	do{
-		// if(parameters->isAddingNewGroups())
-		// 	reintro_bacteria();
-
 		// update time:
 		time += chemical_time_step;
 		++time_step_number;
@@ -334,23 +331,12 @@ FullSimulator<dim>::test_chemical_flow()
 		if(time_step_number % modsave == 0)
 		{
 			std::cout << "saving at time: " << time << std::endl;
-			// if(isSavingChemicals)
-			output_chemicals(); // *** try saving projected version to triple check***
-			// output_bacteria();
+			output_chemicals(); 
 			++save_step_number;
 		}
 
 		// chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates());
 		chemicals.update();
-
-		// if(time_step_number % bacteria_time_step_multiplier == 0)
-		// {
-		// 	update_bacteria();
-		// 	std::cout << "number bacteria: " << bacteria.getTotalNumber() << std::endl;
-		// }
-
-	   	// if( !bacteria.isAlive() )
-	   		// std::cout << "\n\nEverybody died!" << std::endl;
 	}while( (time < run_time) );
 
 }
@@ -358,6 +344,9 @@ FullSimulator<dim>::test_chemical_flow()
 
 // UPDATE:
 // --------------------------------------------------------------------------
+
+/** \brief Update bacteria */
+/** Do random walk, reproduce, and mutate */
 template<int dim>
 void
 FullSimulator<dim>::update_bacteria()
@@ -368,12 +357,17 @@ FullSimulator<dim>::update_bacteria()
 
 	bacteria.reproduce(bacteria_time_step, fitness_function);
 
-	bacteria.mutate_simple(bacteria_time_step, mutation_rate, mutation_strength);
+	/** @todo have bacteria class figure out if mutation is binary */
+	if(binary_mutating)
+		bacteria.mutate_binary(bacteria_time_step, mutation_rate, original_rate);
+	else
+		bacteria.mutate_simple(bacteria_time_step, mutation_rate, mutation_strength);
 }
 
 // OUTPUT:
 // --------------------------------------------------------------------------
 
+/** \brief Output bacteria to file in simulation output directory */
 template<int dim>
 void
 FullSimulator<dim>::output_bacteria() const
@@ -386,6 +380,7 @@ FullSimulator<dim>::output_bacteria() const
 	bacteria.print(out);
 }
 
+/** \brief Output chemical fields to file in simulation output directory */
 template<int dim>
 void
 FullSimulator<dim>::output_chemicals(bool isGridSave) const
@@ -400,6 +395,10 @@ FullSimulator<dim>::output_chemicals(bool isGridSave) const
 // SETUP:
 // ------------------------------------------------------------------------
 
+/** \brief Setup simulation system */
+/** Read in parameters, construct and intialize required objects,
+* and output simulation information to simulation directory 
+*/
 template<int dim>
 void
 FullSimulator<dim>::setup_system()
@@ -462,6 +461,7 @@ FullSimulator<dim>::setup_system()
 	std::cout << std::endl << std::endl;
 } // setup_system()
 
+/** \brief Store local parameters read in from file */
 template<int dim>
 void
 FullSimulator<dim>::assign_local_parameters()
@@ -470,8 +470,12 @@ FullSimulator<dim>::assign_local_parameters()
 	save_period = prm.get_double("Save period");
 	mutation_rate = prm.get_double("Bacteria", "Mutation rate");
 	mutation_strength = prm.get_double("Bacteria", "Mutation strength");
+
+	binary_mutating = prm.get_bool("Bacteria", "Binary mutation");
+	original_rate = prm.get_double_vector("Bacteria", "Secretion rate")[0];
 }
 
+/** \brief Setup suitable time steps for bacteria and chemicals */
 template<int dim>
 void
 FullSimulator<dim>::setup_time_steps()
@@ -483,6 +487,7 @@ FullSimulator<dim>::setup_time_steps()
 	bacteria_time_step = bacteria_time_step_multiplier*chemical_time_step;
 }
 
+/** \brief Get stable chemical time step from CFL condition */
 template<int dim>
 double
 FullSimulator<dim>::get_chemical_time_step()
@@ -502,6 +507,8 @@ FullSimulator<dim>::get_chemical_time_step()
 	return cfl_time_step;
 }
 
+/** \brief Setup fitness object for bacteria reproduction */
+/** @todo Move this to a fitness_handler class ... */
 template<int dim>
 void
 FullSimulator<dim>::setup_fitness()
@@ -519,6 +526,9 @@ FullSimulator<dim>::setup_fitness()
 			prm.get_double_vector(section, "Chemical saturation"));
 }
 
+/** \brief Declare local parameters needed for simulator 
+* to be read in from file
+*/
 template<int dim>
 void 
 FullSimulator<dim>::declare_parameters()
@@ -540,11 +550,10 @@ FullSimulator<dim>::declare_parameters()
 	GridGenerationTools::declare_parameters(prm);
 	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
 	Chemicals::Controls<dim>::declare_parameters(prm);
-	BacteriaNew::BacteriaHandler<dim>::declare_parameters(prm);
-	BacteriaNew::Fitness::declare_parameters(prm);
-
-
+	Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
+	Bacteria::Fitness::declare_parameters(prm);
 }
+
 
 } // close namespace
 #endif

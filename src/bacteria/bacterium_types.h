@@ -15,7 +15,7 @@ using dealii::Point;
 #include <memory>
 
 
-namespace MicrobeSimulator{ namespace BacteriaNew{
+namespace MicrobeSimulator{ namespace Bacteria{
 
 template<int dim>
 class BacteriumBase{

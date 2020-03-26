@@ -976,7 +976,8 @@ void ParameterHandler::print_recursive_simple(std::ostream& out,
 {
 	if (tree.empty()) 
 	{
-		out << "\""<< tree.data()<< "\"" << std::endl;
+		/** @todo adjust precision appropriately... //std::setprecission(10) << */
+		out << "\""<<  tree.data()<< "\"" << std::endl;
 	}
 	else 
 	{

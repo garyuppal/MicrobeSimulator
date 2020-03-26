@@ -10,7 +10,7 @@ using dealii::Point;
 #include <vector>
 #include <memory>
 
-namespace MicrobeSimulator{ namespace BacteriaNew{
+namespace MicrobeSimulator{ namespace Bacteria{
 
 namespace Fitness{
 	void declare_parameters(ParameterHandler& prm)
