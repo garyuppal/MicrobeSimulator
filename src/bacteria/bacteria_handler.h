@@ -21,7 +21,7 @@ namespace MicrobeSimulator{
 template<int dim>
 std::vector<Point<dim> >
 get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups,
-	double buffer, double left_length) // = -1)
+	double buffer, double left_length)
 {
 	std::cout << "...Finding " << number_groups
 		<< " group positions" << std::endl;
@@ -71,27 +71,15 @@ public:
 
 	static void declare_parameters(ParameterHandler& prm);
 
-	void init(const ParameterHandler& prm, const Geometry<dim>& geo);
-
+	void init(const ParameterHandler& prm, const Geometry<dim>& geo); 
 	void reintro(const ParameterHandler& prm, const Geometry<dim>& geo);
 
-	// temporary initialization for testing:
-	void init_reg(double db, unsigned int n_bact, double pg_rate, double waste_rate);
-
 	// MODIFIERS:
-	void randomWalk(double dt, const Geometry<dim>& geometry,
-			const Velocity::AdvectionHandler<dim>& velocity, double buffer=0);
-	void randomWalk(double dt, const Geometry<dim>& geometry,
-			const Velocity::AdvectionHandler<dim>& velocity,
-			std::vector<double>& pg_rates, double buffer=0);
-
-	void reproduce(double dt, const FitnessBase<dim>& fitness_function); // need to change this
-	// void mutate(double dt); // general mutation method ... 
-
-	// simple version for now:
-	void mutate_simple(double dt, double mutation_rate, double ds);
-	void mutate_binary(double dt, double mutation_rate, double orig_sec); 
-
+	void move(double dt, const Geometry<dim>& geometry, 
+		const Velocity::AdvectionHandler<dim>& velocity); 
+	void mutate(double dt);
+	void reproduce(double dt, const FitnessBase<dim>& fitness_function); 
+	
 	// ACCESSORS:
 	double getDiffusionConstant() const;
 	unsigned int getTotalNumber() const; 
@@ -99,6 +87,8 @@ public:
 	std::vector<Point<dim> > 		getAllLocations() const;
 	std::vector<double> 			getAllRates(unsigned int index) const;
 	std::vector<std::vector<double> > getAllRates() const;
+
+	std::vector<double> get_pg_rates();
 
 	bool isAlive() const;
 
@@ -110,8 +100,15 @@ private:
 	std::vector<std::unique_ptr<BacteriumBase<dim> > > bacteria;
 
 	double diffusion_constant;
+	double mutation_rate;
+	double mutation_strength;
+	bool binary_mutation;
+	double original_rate; /** @todo need to generalize for multiple chemicals */
+	double edge_buffer; 
 
-	void remove_fallen_bacteria(double right_edge);
+	// recording fallen bacteria:
+	std::vector<double> pg_rates;
+
 	void remove_and_capture_fallen_bacteria(
 		double right_edge, std::vector<double>& pg_rates);
 
@@ -124,6 +121,13 @@ private:
 /** \brief Constructor for BacteriaHandler */
 template<int dim>
 BacteriaHandler<dim>::BacteriaHandler()
+	:
+	diffusion_constant(0),
+	mutation_rate(0),
+	mutation_strength(0),
+	binary_mutation(false),
+	original_rate(0),
+	edge_buffer(0)
 {}
 
 /** \brief Declare parameters needed to constuct bacteria */
@@ -161,7 +165,18 @@ template<int dim>
 void 
 BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo)
 {
-	const unsigned int n_bact = prm.get_unsigned("Bacteria", "Number bacteria");
+	const std::string section = "Bacteria";
+
+	// assign constants:
+	mutation_rate = prm.get_double(section, "Mutation rate");
+	mutation_strength = prm.get_double(section, "Mutation strength");
+	binary_mutation = prm.get_bool(section, "Binary mutation");
+	/** @todo generalize this to multiple possible chemicals */
+	original_rate = prm.get_double_vector(section, "Secretion rate")[0];
+	edge_buffer = prm.get_double(section,"Edge buffer");
+
+	// add bacteria:
+	const unsigned int n_bact = prm.get_unsigned(section, "Number bacteria");
 	bacteria.clear();
 	bacteria.reserve(n_bact);
 
@@ -211,77 +226,50 @@ BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<d
 	}	
 }
 
-/** \brief Construct ordinary type bacteria from given parameters. */
-/** init() is often used instead of this method to construct from
-* parameter handler and domain geometry
-* @todo remove this method?
-*/
-template<int dim>
-void
-BacteriaHandler<dim>::init_reg(double db, 
-	unsigned int n_bact, double pg_rate, double waste_rate)
-{
-	diffusion_constant = db;
-	bacteria.clear();
-	bacteria.reserve(n_bact);
-
-	Point<dim> location = (dim == 2) ? Point<dim>(0,0)
-									: Point<dim>(0,0,0);
-
-	std::vector<double> rates = {pg_rate,waste_rate};
-
-	for(unsigned int i = 0; i < n_bact; ++i)
-		bacteria.emplace_back(new BacteriumBase<dim>(location,rates) );
-}
-
-/** \brief random walk method*/
-/** @todo move buffer and pg rates to this class, and call only one method in simulator*/
 template<int dim>
 void 
-BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
-			const Velocity::AdvectionHandler<dim>& velocity,
-			double buffer)
+BacteriaHandler<dim>::move(double dt, const Geometry<dim>& geometry, 
+	const Velocity::AdvectionHandler<dim>& velocity)
 {
 	for(unsigned int i = 0; i < bacteria.size(); ++i)
-		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity, buffer);
-
-	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
-		remove_fallen_bacteria(geometry.getTopRightPoint()[0]);	
-}
-
-/** \brief random walk method*/
-/** @todo move buffer and pg rates to this class, and call only one method in simulator*/
-template<int dim>
-void 
-BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
-		const Velocity::AdvectionHandler<dim>& velocity,
-		std::vector<double>& pg_rates,
-		double buffer)
-{
-	// std::cout << "doing random walk" << std::endl;
-	for(unsigned int i = 0; i < bacteria.size(); ++i)
-		bacteria[i]->randomStep(dt, diffusion_constant, geometry, velocity, buffer);
+		bacteria[i]->randomStep(dt, diffusion_constant, 
+			geometry, velocity, edge_buffer);
 
 	// if boundary is open, remove fallen bacteria:
 	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
 		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0],
 											pg_rates);	
+
 }
 
-/** \brief Remove bacteria that move past right boundary*/
 template<int dim>
 void 
-BacteriaHandler<dim>::remove_fallen_bacteria(double right_edge)
+BacteriaHandler<dim>::mutate(double dt)
 {
-	const double tolerance = 1e-4;
-	for(auto it = bacteria.begin(); it != bacteria.end(); )
+	// loop through bacteria:
+	for(auto it = bacteria.begin(); it != bacteria.end(); ++it)
 	{
-		if( (*it)->getLocation()[0] > (right_edge - tolerance) ) 
-			it = bacteria.erase(it);
-		else
-			++it;
+		double prob = dt*Utility::getRand();
+		if(prob < mutation_rate)
+		{
+			double sec = original_rate;
+			if(binary_mutation)
+			{
+				double current_sec = (*it)->getSecretionRate(0);
+				if(current_sec > 0)
+					sec = 0;
+			}
+			else
+			{
+				sec = (*it)->getSecretionRate(0) 
+					+ mutation_strength*(2.0*Utility::getRand()-1.0);
+				if(sec < 0)
+					sec = 0;
+			}
+			(*it)->setSecretionRate(0, sec);
+		} // if mutating
 	} // for all bacteria
-} // remove_fallen_bacteria()
+}
 
 /** \brief Remove and record public good secretion rates of fallen bacteria */
 template<int dim>
@@ -305,14 +293,15 @@ BacteriaHandler<dim>::remove_and_capture_fallen_bacteria(
 	} // for all bacteria
 } // remove_and_capture_fallen_bacteria()
 
-// simple implementaiton to get working, speed up later:
-// *** instead of recloning, and for future improvement,
-// can we move the pointer instead? (there should be  a move function for unique_ptr)
+/** \brief Reproduce bacteria according to supplied fitness function and time step */
+/** @todo Can probably speed up */
 template<int dim>
 void 
 BacteriaHandler<dim>::reproduce(
 	double dt, const FitnessBase<dim>& fitness_function)
 {
+// simple implementaiton to get working, speed up later:
+// instead of recloning, and for future improvement, can we move the pointer instead? (there should be  a move function for unique_ptr)
 	std::vector<std::unique_ptr<BacteriumBase<dim> > > offspring;
 
 	for(auto it = bacteria.begin(); it != bacteria.end(); )
@@ -342,49 +331,7 @@ BacteriaHandler<dim>::reproduce(
 	// add offspring to end: 
 	for(unsigned int i = 0; i < offspring.size(); ++i)
 		bacteria.emplace_back( offspring[i]->clone() );
-	// bacteria.insert(bacteria.end(), offspring.begin(), offspring.end());
 } // reproduce()
-
-/** \brief Continuous mutation */
-/** @todo Generalize to mutliple goods */
-template<int dim>
-void 
-BacteriaHandler<dim>::mutate_simple(double dt, double mutation_rate, double ds)
-{
-	// loop through bacteria:
-	for(auto it = bacteria.begin(); it != bacteria.end(); ++it)
-	{
-		double prob = dt*Utility::getRand();
-		if(prob < mutation_rate)
-		{
-			double sec = (*it)->getSecretionRate(0) + ds*(2.0*Utility::getRand()-1.0);
-			if(sec < 0)
-				sec = 0;
-			(*it)->setSecretionRate(0, sec);
-		} // if mutating
-	} // for all bacteria
-} // mutate_simple()
-
-/** \brief Binary mutation */
-/** @todo Generalize to mutliple goods */
-template<int dim>
-void 
-BacteriaHandler<dim>::mutate_binary(double dt, double mutation_rate, double orig_sec)
-{
-	// loop through bacteria:
-	for(auto it = bacteria.begin(); it != bacteria.end(); ++it)
-	{
-		double prob = dt*Utility::getRand();
-		if(prob < mutation_rate)
-		{
-			double current_sec = (*it)->getSecretionRate(0);
-			double sec = orig_sec;
-			if(current_sec > 0)
-				sec = 0;
-			(*it)->setSecretionRate(0, sec);
-		} // if mutating
-	} // for all bacteria
-} // mutate_simple()
 
 
 // ACCESSORS:
@@ -450,25 +397,23 @@ BacteriaHandler<dim>::getAllRates() const
 	}
 
 	const unsigned int num_chem = bacteria[0]->getSecretionRates().size();
-	// std::cout << "\n\n\n\n!!!!number chemicals = " << num_chem << "\n\n\n" << std::endl;
 
 	all_rates.reserve(num_chem);
 	for(unsigned int c = 0; c < num_chem; ++c)
 		all_rates.emplace_back(getAllRates(c));
 
-	// all_rates.reserve(num_chem);
-
-	// for(unsigned int c = 0; c < num_chem; ++c)
-	// {
-	// 	all_rates[c].reserve(bacteria.size());
-	// 	for(unsigned int i = 0; i < bacteria.size(); ++i)
-	// 		all_rates[c].emplace_back(bacteria[i]->getSecretionRate(c)); 
-	// }
-
 	return all_rates;
 }
 
+/** \brief Return public good secretion rates of captured bacteria */
+template<int dim>
+std::vector<double>
+BacteriaHandler<dim>::get_pg_rates()
+{
+	return pg_rates;
+}
 
+/** \brief Returns true is bacteria not empty */
 template<int dim>
 bool 
 BacteriaHandler<dim>::isAlive() const
@@ -476,7 +421,7 @@ BacteriaHandler<dim>::isAlive() const
 	return !(bacteria.empty());
 }
 
-
+/** \brief Prints out bacteria info for each bacteria to given ostream object */
 template<int dim>
 void
 BacteriaHandler<dim>::print(std::ostream& out) const
@@ -488,6 +433,7 @@ BacteriaHandler<dim>::print(std::ostream& out) const
 	}
 }
 
+/** \brief Prints out general info for bacteria to provided ostream object */
 template<int dim>
 void 
 BacteriaHandler<dim>::printInfo(std::ostream& out) const
@@ -505,8 +451,8 @@ BacteriaHandler<dim>::printInfo(std::ostream& out) const
 		out << srates[i] << " ";
 	out << std::endl << Utility::medium_line << std::endl
 		<< std::endl << std::endl;
-
 }
+
 
 }} // CLOSE NAMESPACE
 #endif
