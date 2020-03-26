@@ -48,10 +48,10 @@ RM = /afs/crc.nd.edu/x86_64_linux/c/cmake/3.13.2/bin/cmake -E remove -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/zrefactor_12_13_19
+CMAKE_SOURCE_DIR = /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/microbe_simulator
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/zrefactor_12_13_19
+CMAKE_BINARY_DIR = /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/microbe_simulator
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -80,9 +80,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/zrefactor_12_13_19/CMakeFiles /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/zrefactor_12_13_19/CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/microbe_simulator/CMakeFiles /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/microbe_simulator/CMakeFiles/progress.marks
 	$(MAKE) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/zrefactor_12_13_19/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /afs/crc.nd.edu/user/g/guppal/cpp_bacteria/microbe_simulator/CMakeFiles 0
 .PHONY : all
 
 # The main clean target

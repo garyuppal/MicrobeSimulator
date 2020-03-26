@@ -21,11 +21,8 @@ namespace MicrobeSimulator{
 template<int dim>
 std::vector<Point<dim> >
 get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups,
-	double left_length = -1)
+	double buffer, double left_length) // = -1)
 {
-	/** @todo Add buffer so groups do not come too close to objects when using
-	* non-zero buffer
-	*/
 	std::cout << "...Finding " << number_groups
 		<< " group positions" << std::endl;
 
@@ -41,17 +38,19 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		{
 		  for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
 		  {
-		  	double width = geometry.getWidth(dim_itr);
+		  	double width = geometry.getWidth(dim_itr) - 2.0*buffer;
+		  	assert(width>0); // error if buffer too big
+		  	// though this should be caught by geometry builder already
 
 		  	// possibly initialize in subdomain:
 		  	if( (dim_itr == 0) && (left_length > 0) )
 		  		width = left_length; 
 
 		    temp_point[dim_itr] = (width)*((double)rand() / RAND_MAX) 
-		      + geometry.getBottomLeftPoint()[dim_itr];
+		      + geometry.getBottomLeftPoint()[dim_itr] + buffer;
 		  }
 
-		  if( geometry.isInDomain(temp_point) )
+		  if( geometry.isInDomain(temp_point, buffer) )
 		  {
 		    group_locations.emplace_back(temp_point);
 		    found = true;
@@ -192,12 +191,15 @@ BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<d
 
 	std::vector<Point<2> > initial_locations = prm.get_point_list(section, "Initial locations");
 
+	double edge_buffer = prm.get_double("Bacteria","Edge buffer");
+
 	if(initial_locations.empty()) // if not given from parameters
 	{
 		if(number_groups == 0)
 			number_groups = n_bact;
 		const double left_length = prm.get_double(section, "Left subdomain length");
-		initial_locations = get_bacteria_locations(geo, number_groups, left_length);
+		initial_locations = get_bacteria_locations(geo, number_groups, 
+			edge_buffer, left_length);
 	}
 
 	for(unsigned int i = 0; i < n_bact; ++i)
@@ -232,7 +234,8 @@ BacteriaHandler<dim>::init_reg(double db,
 		bacteria.emplace_back(new BacteriumBase<dim>(location,rates) );
 }
 
-/** \brief */
+/** \brief random walk method*/
+/** @todo move buffer and pg rates to this class, and call only one method in simulator*/
 template<int dim>
 void 
 BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
@@ -246,6 +249,8 @@ BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
 		remove_fallen_bacteria(geometry.getTopRightPoint()[0]);	
 }
 
+/** \brief random walk method*/
+/** @todo move buffer and pg rates to this class, and call only one method in simulator*/
 template<int dim>
 void 
 BacteriaHandler<dim>::randomWalk(double dt, const Geometry<dim>& geometry,
@@ -381,7 +386,11 @@ BacteriaHandler<dim>::mutate_binary(double dt, double mutation_rate, double orig
 	} // for all bacteria
 } // mutate_simple()
 
+
 // ACCESSORS:
+// -------------------------------------------------------
+
+/** \brief Returns diffusion constant for bacteria */
 template<int dim>
 double 
 BacteriaHandler<dim>::getDiffusionConstant() const
@@ -389,6 +398,7 @@ BacteriaHandler<dim>::getDiffusionConstant() const
 	return diffusion_constant;
 }
 
+/** \brief Returns total number of current bacteria */
 template<int dim>
 unsigned int 
 BacteriaHandler<dim>::getTotalNumber() const
@@ -396,6 +406,7 @@ BacteriaHandler<dim>::getTotalNumber() const
 	return bacteria.size();
 }
 
+/** \brief Returns all locations of bacteria */
 template<int dim>
 std::vector<Point<dim> > 		
 BacteriaHandler<dim>::getAllLocations() const
@@ -409,6 +420,7 @@ BacteriaHandler<dim>::getAllLocations() const
 	return all_loc;
 }
 
+/** \brief Return all secretion rates for ith chemical */
 template<int dim>
 std::vector<double> 			
 BacteriaHandler<dim>::getAllRates(unsigned int index) const
@@ -423,6 +435,8 @@ BacteriaHandler<dim>::getAllRates(unsigned int index) const
 	return all_rates;
 }
 
+/** \brief Returns vector of vector of doubles for all secretion rates
+* of all chemicals */
 template<int dim>
 std::vector<std::vector<double> > 
 BacteriaHandler<dim>::getAllRates() const
@@ -454,13 +468,6 @@ BacteriaHandler<dim>::getAllRates() const
 	return all_rates;
 }
 
-
-// template<int dim>
-// std::vector<std::vector<double> > 
-// BacteriaHandler<dim>::getAllRates() const
-// {
-
-// }
 
 template<int dim>
 bool 

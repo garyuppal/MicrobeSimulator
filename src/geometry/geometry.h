@@ -103,7 +103,7 @@ public:
 	                   Point<dim>& newPoint,
 	                   const double buffer = 0.005) const; 
 
-	bool isInDomain(const Point<dim>& location) const; 
+	bool isInDomain(const Point<dim>& location, double buffer=0) const; 
 
 	void addPointBuffer(const double buffer,
 	                   const Point<dim>& test_point,
@@ -358,22 +358,23 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 /** @todo ADD BUFFER AS WELL */
 template<int dim>
 bool 
-Geometry<dim>::isInDomain(const Point<dim>& location) const
+Geometry<dim>::isInDomain(const Point<dim>& location, double buffer) const
 {
 	// should have that point is in box, but still check:
 	for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
-		if(location[dim_itr] < bottom_left[dim_itr] || location[dim_itr] > top_right[dim_itr])
+		if( location[dim_itr] < (bottom_left[dim_itr] + buffer)
+			|| location[dim_itr] > (top_right[dim_itr]-buffer) )
 	   		return false;
 
 	// check obstacles...
 	unsigned int number_spheres = spheres.size();
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
-		if( spheres[sphere_id].isInSphere(location))
+		if( spheres[sphere_id].isInSphere(location, buffer))
 	   		return false;
 
 	unsigned int number_rectangles = rectangles.size();
 	for(unsigned int rect = 0; rect < number_rectangles; ++rect)
-	 	if(rectangles[rect].distance_from_border(location) < 1e-8)
+	 	if(rectangles[rect].distance_from_border(location) + buffer < 1e-8)
 	   		return false;
 
 	return true;
