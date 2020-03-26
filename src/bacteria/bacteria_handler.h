@@ -180,6 +180,11 @@ BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo
 	bacteria.clear();
 	bacteria.reserve(n_bact);
 
+	std::cout << "Mutation rate: \n\t";
+	std::cout << std::setprecision(15) << mutation_rate << std::endl; 
+
+	throw std::runtime_error("done"); 
+
 	add_bacteria(prm,geo);
 } 
 
@@ -249,8 +254,8 @@ BacteriaHandler<dim>::mutate(double dt)
 	// loop through bacteria:
 	for(auto it = bacteria.begin(); it != bacteria.end(); ++it)
 	{
-		double prob = dt*Utility::getRand();
-		if(prob < mutation_rate)
+		double prob = Utility::getRand(); 
+		if(prob < (dt*mutation_rate) )
 		{
 			double sec = original_rate;
 			if(binary_mutation)
