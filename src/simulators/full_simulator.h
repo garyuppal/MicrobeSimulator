@@ -20,6 +20,8 @@ using dealii::Triangulation;
 /** @file
 * \brief Simulator file
 * Simulation class defined here
+* @todo add parameter handler pattern checking
+* @todo add list option to parameter looping
 */
 
 /** \brief Main namespace for MicrobeSimulator */

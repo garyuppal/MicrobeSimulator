@@ -180,11 +180,6 @@ BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo
 	bacteria.clear();
 	bacteria.reserve(n_bact);
 
-	std::cout << "Mutation rate: \n\t";
-	std::cout << std::setprecision(15) << mutation_rate << std::endl; 
-
-	throw std::runtime_error("done"); 
-
 	add_bacteria(prm,geo);
 } 
 
@@ -443,10 +438,19 @@ template<int dim>
 void 
 BacteriaHandler<dim>::printInfo(std::ostream& out) const
 {
+	std::string mstren;
+	if(binary_mutation)
+		mstren = "Binary";
+	else
+		mstren = std::to_string(mutation_strength);
+
 	out << "\n\n" << Utility::medium_line << std::endl 
 		<< "\t\t BACTERIA INFO:" << std::endl
 		<< Utility::medium_line << std::endl
 		<< "\t Diffusion constant: " << diffusion_constant << std::endl
+		<< "\t Mutation rate: " << mutation_rate << std::endl
+		<< "\t Mutation strength: " << mstren << std::endl
+		<< "\t Edge buffer: " << edge_buffer << std::endl
 		<< "\t Number bacteria: " << bacteria.size() << std::endl
 		<< "\t First Bacterium: " << bacteria[0]->getLocation() << std::endl
 		<< "\t First secretion rates:";
