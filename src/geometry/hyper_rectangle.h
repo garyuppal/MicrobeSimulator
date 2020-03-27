@@ -9,8 +9,9 @@ using dealii::Tensor;
 
 namespace MicrobeSimulator{
 
-  template<int dim>
-  class HyperRectangle{
+/** \brief HyperRectangle class for interior rectangular obstacles */
+template<int dim>
+class HyperRectangle{
   private:
     Point<dim> bottom_left;
     Point<dim> top_right;
@@ -18,7 +19,6 @@ namespace MicrobeSimulator{
     HyperRectangle();
     HyperRectangle(const Point<dim>& lower,
       const Point<dim>& upper);
-    HyperRectangle(const HyperRectangle& rect);
 
     // accessors:
     Point<dim> getBottomLeft() const;
@@ -36,14 +36,18 @@ namespace MicrobeSimulator{
                       Point<dim>& new_point,
                       const double buffer = 0.) const;
 
-  }; // class Sphere{}
+  }; // class HyperRectangle{}
+
 
 // IMPLEMENTATION
 // -------------------------------------------------------------------
+
+  /** \brief Default constructor */
   template<int dim>
   HyperRectangle<dim>::HyperRectangle()
   {}
 
+  /** \brief Constuctor given endpoints */
   template<int dim>
   HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
       const Point<dim>& upper)
@@ -52,14 +56,9 @@ namespace MicrobeSimulator{
     top_right(upper)
   {}
 
-  template<int dim>
-  HyperRectangle<dim>::HyperRectangle(const HyperRectangle& rect)
-  {
-    bottom_left = rect.bottom_left;
-    top_right = rect.top_right;
-  }
-
   // accessors:
+
+  /** \brief Return bottom left corner of rectangle */
   template<int dim>
   Point<dim> 
   HyperRectangle<dim>::getBottomLeft() const
@@ -67,6 +66,7 @@ namespace MicrobeSimulator{
     return bottom_left;
   }
 
+  /** \brief Return top right corner of rectangle */
   template<int dim>
   Point<dim> 
   HyperRectangle<dim>::getTopRight() const
@@ -75,6 +75,8 @@ namespace MicrobeSimulator{
   }
 
   // mutators:
+
+  /** \brief Set bottom left point of rectangle */
   template<int dim>
   void 
   HyperRectangle<dim>::setBottomLeft(const Point<dim>& bl)
@@ -82,6 +84,7 @@ namespace MicrobeSimulator{
     bottom_left = bl;
   }
   
+  /** \brief Set top right point of rectangle */
   template<int dim>
   void 
   HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
@@ -89,6 +92,7 @@ namespace MicrobeSimulator{
     top_right = tr;
   }
 
+  /** \brief Return distance to outer boundary of rectangle */
   template<int dim>
   double 
   HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
@@ -107,14 +111,11 @@ namespace MicrobeSimulator{
       distance += (dx*dx);
     }
 
-    return distance;
-
-//     dx = max(abs(px - x) - width / 2, 0);
-// dy = max(abs(py - y) - height / 2, 0);
-// return dx * dx + dy * dy;
+    return std::sqrt(distance);
   }
 
-
+  /** \brief Reflect point off of rectangle
+  */
   template<int dim>
   void 
   HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
@@ -152,7 +153,7 @@ namespace MicrobeSimulator{
 
   } // reflect point incident on rectangle
 
-
+  /** \brief Get unit vector normal to rectangle in direction of supplied point */
   template<int dim>
   Tensor<1, dim> 
   HyperRectangle<dim>::getNormalVector(const Point<dim>& p) const

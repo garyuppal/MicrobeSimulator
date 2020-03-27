@@ -790,16 +790,17 @@ Filter<2>::attach_filter_channels(Triangulation<2>& left_side) const
 template<int dim>
 void 
 Filter<dim>::printInfo(std::ostream& out) const
-{		out << Utility::short_line << std::endl
-			<< "\tFILTER:" << std::endl
-			<< Utility::short_line << std::endl
-			<< "Number channels: " << number_channels << std::endl
-			<< "Channel thickness: " << channel_thickness << std::endl
-			<< "Wall thickness: " << wall_thickness << std::endl
-			<< "Left length: " << left_length << std::endl
-			<< "Center length: " << center_length << std::endl
-			<< "Right length: " << right_length << std::endl
-			<< Utility::short_line << std::endl << std::endl;
+{		
+	out << Utility::short_line << std::endl
+		<< "\tFILTER:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Number channels: " << number_channels << std::endl
+		<< "Channel thickness: " << channel_thickness << std::endl
+		<< "Wall thickness: " << wall_thickness << std::endl
+		<< "Left length: " << left_length << std::endl
+		<< "Center length: " << center_length << std::endl
+		<< "Right length: " << right_length << std::endl
+		<< Utility::short_line << std::endl << std::endl;
 }
 
 
@@ -1294,28 +1295,117 @@ Splitter<dim>::add_splitter_ends(Triangulation<dim>& center,
 // -------------------------------------------------------------------------------
 // 		VORTEX / CYLINDRICAL PIPE (extruded vortex):
 // -------------------------------------------------------------------------------
-// template<int dim>
-// class Cylinder : public BuilderBase<dim>{
-// 	// constructor
-// 	Cylinder(const ParameterHandler& prm);
+/** \brief Cylinder geometry builder. 2D version gives a circle,
+* and 3D a cylindrical pipe */
+template<int dim>
+class Cylinder : public BuilderBase<dim>{
+	// constructor
+	Cylinder(const ParameterHandler& prm);
 
-// 	// class parameters:
-// 	static void declare_parameters(ParameterHandler& prm);
+	// class parameters:
+	static void declare_parameters(ParameterHandler& prm);
 
-// 	// override virtual methods:
-// 	void build_geometry(Geometry<dim>& geo) const override; 
-// 	void build_grid_base(Triangulation<dim>& tria) const override; 
-// 	void printInfo(std::ostream& out) const override;
-// private:
-// 	double radius;
-// 	// for 3D:
-// 	double length;
-// };
+	// override virtual methods:
+	void build_geometry(Geometry<dim>& geo) const override; 
+	void build_grid_base(Triangulation<dim>& tria) const override; 
+	void printInfo(std::ostream& out) const override;
+private:
+	double radius;
+
+	// for 3D:
+	double length;
+};
+
+// IMPL
+// --------------------------------------------------------------------
+
+/** \brief Constuctor for cylinder geometry builder */
+template<int dim>
+Cylinder<dim>::Cylinder(const ParameterHandler& prm)
+	:
+	BuilderBase<dim>(prm)
+{
+	const std::string subsection = "Geometry.Cylinder";
+	radius = prm.get_double(subsection, "Radius");
+	length = prm.get_double(subsection, "Length");
+}
+
+// class parameters:
+/** \brief Declare parameters for cylinder geometry */
+template<int dim>
+void 
+Cylinder<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Cylinder");
+			prm.declare_entry("Radius","1",Patterns::Double());
+			prm.declare_entry("Length","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+// override virtual methods:
+
+/** \brief Build cylinder geometry */
+template<int dim>
+void 
+Cylinder<dim>::build_geometry(Geometry<dim>& geo) const
+{
+	Point<dim> origin, bl, tr;
+	for(unsigned int i = 0; i < dim; ++i)
+	{
+		origin[i] = 0;
+		bl[i] = -radius;
+		tr[i] = radius;
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT);
+	}
+	if(dim==3)
+	{
+		bl[2] = 0;
+		tr[2] = length; // extruded in z-direction
+	}
+
+	geo.setBottomLeftPoint(bl);
+	geo.setTopRightPoint(tr);
+
+	// add exterior sphere, centered at origin:
+	geo.addSphere(Sphere<dim>(origin, radius, ObstacleType::EXTERIOR));
+}
+
+/** \brief Build cylinder grid */
+/** @todo still need to implement, also may need to override boundary labeling and manifolds */
+template<int dim>
+void 
+Cylinder<dim>::build_grid_base(Triangulation<dim>& tria) const
+{
+	std::cout << "STILL NEED TO IMPLEMENT CYLINDRICAL GRID" << std::endl;
+		// also sphere interior reflection
+	// extrude to 3d, test with cylindrical advection, may need to modify velocity too
+	// also test vortex
+	// another nice geometry could by filtering by cylindrical shells...
+	// would need to implement hollow cylindrical shell obstacles...
+}
+
+template<int dim>
+void 
+Cylinder<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\tCYLINDER:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Radius: " << radius << std::endl
+		<< "Length: " << length << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
 
 // -------------------------------------------------------------------------------
 // 		FROM FILE(S):
 // -------------------------------------------------------------------------------
+// template<int dim>
+// class FileGeometry : public BuilderBase<dim>{
 
+// };
 
 
 

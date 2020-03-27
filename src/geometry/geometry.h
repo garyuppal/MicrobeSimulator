@@ -15,10 +15,6 @@
 #include "../utility/parameter_handler.h"
 
 
-/** @file
-* @todo add circle boundary for vortex and cylinder... (also need to make mesh)
-*/
-
 namespace MicrobeSimulator{
 
 	/** \brief Enum type for boundary conditions */
@@ -308,7 +304,7 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 {
 	const double tolerance = 1e-8;
 
-	// check interior spheres:
+	// check interior and exterior spheres:
 	unsigned int number_spheres = spheres.size();
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
 		if( (spheres[sphere_id].distance_from_border(newPoint) - buffer) < tolerance)
@@ -355,23 +351,23 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 /** \brief Checks if point is within the domain and not inside any
 * interior obstacles.
 */
-/** @todo ADD BUFFER AS WELL */
 template<int dim>
 bool 
 Geometry<dim>::isInDomain(const Point<dim>& location, double buffer) const
 {
-	// should have that point is in box, but still check:
+	// check bounding box:
 	for(unsigned int dim_itr = 0; dim_itr < dim; dim_itr++)
 		if( location[dim_itr] < (bottom_left[dim_itr] + buffer)
-			|| location[dim_itr] > (top_right[dim_itr]-buffer) )
+			|| location[dim_itr] > (top_right[dim_itr] - buffer) )
 	   		return false;
 
-	// check obstacles...
+	// check interior/exterior spheres:
 	unsigned int number_spheres = spheres.size();
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
 		if( spheres[sphere_id].isInSphere(location, buffer))
 	   		return false;
 
+	// check interior rectangles:
 	unsigned int number_rectangles = rectangles.size();
 	for(unsigned int rect = 0; rect < number_rectangles; ++rect)
 	 	if(rectangles[rect].distance_from_border(location) + buffer < 1e-8)
@@ -412,6 +408,7 @@ Geometry<dim>::addPointBuffer(const double buffer, const Point<dim>& test_point,
 
 /** \brief Returns vector of points in domain at specified resolution.
 * Also gives points around any obstacles are a higher resolution.
+* @todo generalize to 3D
 */
 template<int dim>
 std::vector<Point<dim> > 
@@ -421,10 +418,6 @@ Geometry<dim>::getQuerryPoints(double resolution) const
 		throw std::invalid_argument("getQuerryPoints() not implemented for dim != 2");
 	
 	const unsigned int number_spheres = spheres.size();
-
-	// if(number_spheres > 0 && dim != 2)
-	//   throw std::invalid_argument("getQuerryPoints() not implemented for spheres in 3d");
-
 	const unsigned int circlePoints = 32; // can maybe pass this in too
 
 	unsigned int gridPoints = 1;
@@ -453,7 +446,7 @@ Geometry<dim>::getQuerryPoints(double resolution) const
 			} // if point in domain
 
 			theta += dealii::numbers::PI/16.0;
-		} // for circle points @todo : can add more points if querrying 3d spheres
+		} // for circle points 
 	} // for spheres
 
 
@@ -498,7 +491,9 @@ Geometry<dim>::printInfo(std::ostream& out) const
 	out << "\nSPHERES: " << spheres.size() << std::endl;
 	for(unsigned int i = 0; i < spheres.size(); i++)
 		out << "\t Sphere Center: " << spheres[i].getCenter() 
-			<< " \tRadius: " << spheres[i].getRadius() << std::endl;
+			<< " \tRadius: " << spheres[i].getRadius() << std::endl
+			<< " \tType: " 
+				<< getObstacleTypeString(spheres[i].getObstacleType()) << std::endl;
 
 	out << "\nRECTANGLES: " << rectangles.size() << std::endl;
 	for(unsigned int i = 0; i < rectangles.size(); i++)
