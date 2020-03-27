@@ -1,0 +1,68 @@
+// Configuration for FILTER geometry simulation
+
+set Simulator type = Bacteria
+set Time step = 0.001 
+set Run time = 10.0
+set Save period = 0.1
+
+subsection Advection
+	set Velocity type = Stokes
+	set Maximum velocity = 2     			
+	set Vortex radius = 0        			
+	set Vortex circulation = 0
+	set Stokes refinement = 3 // note currently gives error if set to 0 and using stokes***
+end
+
+subsection Geometry
+	set Geometry type = Filter 	
+
+	subsection Filter
+		set Number channels = 1:1:5
+		set Fixed height = 4 
+		set Wall thickness = 0.1
+		set Left length = 5
+		set Center length = 8
+		set Right length = 5
+		// set Channel thickness = 1.5
+	end
+
+end 
+
+subsection Mesh
+	set Global refinement = 1
+	set Obstacle refinement = 2
+	set Boundary refinement = 1
+end
+
+subsection Chemicals
+	set Number chemicals = 2
+	set Implementation = {FE, FE}
+	set Diffusion = {5,15}
+	set Decay rate = {50,15}
+	set Save chemicals = False
+	set Time step factor = 1
+	set Viscosity beta = 0.1
+end
+
+subsection Bacteria
+	set Number bacteria = 100
+	set Number groups = 1
+	set Initial locations = {{}}  
+	set Diffusion = 0.05
+	set Edge buffer = 0.1
+	set Secretion rate = {100,100}
+	set Mutation rate = 0.00000
+	set Mutation strength = 100; 
+	set Deterministic number mutate = 0
+	set Deterministic mutate time = 0
+	set Reintroducing = True
+	set Reintroduction period = 2.0
+	set Left subdomain length = 3
+end
+
+subsection Fitness
+	set Fitness type = OR
+	set Chemical fitness = {75,-80}
+	set Secretion cost = 0.2
+	set Chemical saturation = {0.01,0.1}
+end

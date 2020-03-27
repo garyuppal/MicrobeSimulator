@@ -554,6 +554,8 @@ private:
 	double center_length;
 	double right_length;
 
+	double fixed_height;
+
 	/** @todo option to fix total height */
 
 	// support methods:
@@ -564,7 +566,7 @@ private:
 		// THIS DOESNT NEED TO BE A MEMBER FUNCTION...
 
 	void attach_filter_channels(Triangulation<dim>& left_side) const;
-
+	void reassign_channel_thickness(double buffer);
 	// extrusion to 3D:
 	// void extrude(Triangulation<dim>& filter_twodim);
 };
@@ -582,6 +584,7 @@ Filter<dim>::declare_parameters(ParameterHandler& prm)
 			prm.declare_entry("Number channels","1",Patterns::Double());
 			prm.declare_entry("Channel thickness","1",Patterns::Double());
 			prm.declare_entry("Wall thickness","1",Patterns::Double());
+			prm.declare_entry("Fixed height","-1",Patterns::Double());
 			prm.declare_entry("Left length","1",Patterns::Double());
 			prm.declare_entry("Center length","1",Patterns::Double());
 			prm.declare_entry("Right length","1",Patterns::Double());
@@ -593,7 +596,8 @@ Filter<dim>::declare_parameters(ParameterHandler& prm)
 template<int dim>
 Filter<dim>::Filter(const ParameterHandler& prm)
 	:
-	BuilderBase<dim>(prm)
+	BuilderBase<dim>(prm),
+	fixed_height(-1)
 {
 	const std::string subsection = "Geometry.Filter";
 	number_channels = prm.get_unsigned(subsection, "Number channels");
@@ -602,6 +606,27 @@ Filter<dim>::Filter(const ParameterHandler& prm)
 	left_length = prm.get_double(subsection, "Left length");
 	center_length = prm.get_double(subsection, "Center length");
 	right_length = prm.get_double(subsection, "Right length");
+
+	fixed_height = prm.get_double(subsection, "Fixed height");
+
+	double edge_buffer = prm.get_double("Bacteria", "Edge buffer");
+
+	if(fixed_height > 0)
+		reassign_channel_thickness(edge_buffer);
+}
+
+/** \brief Calculate needed channel thickness if using a fixed height */
+template<int dim>
+void
+Filter<dim>::reassign_channel_thickness(double buffer)
+{
+	// check if assigned fixed height is sufficiently large:
+	double gap = fixed_height - (number_channels-1.0)*(wall_thickness + 2.0*buffer) - 2.0*buffer;
+	if(gap <= 0)
+		throw std::runtime_error("Fixed height is too small for given wall thickness, buffer, and number of channels");
+
+	// if ok, find new channel thickness:
+	channel_thickness = ( fixed_height - (number_channels-1.0)*wall_thickness )/number_channels;
 }
 
 /** \brief Build geometry object for filter geometry */

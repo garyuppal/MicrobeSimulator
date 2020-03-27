@@ -55,14 +55,20 @@ def plotAndSnap(data, boundary, rect):
         srates = data[:, 2]
         myColors = [[0, rescaleColor(sr, 100.0), 0] for sr in srates]
         plt.scatter(x, y, s=10, c=myColors)
-        plt.xlim(boundary_data[0, 0], boundary_data[1, 0])
-        plt.ylim(boundary_data[0, 1], boundary_data[1, 1])
+        plt.xlim(boundary[0, 0], boundary[1, 0])
+        plt.ylim(boundary[0, 1], boundary[1, 1])
      
     ax.set_aspect('equal')
-    for i in range(0, rectangles.shape[0]):
-        rect = patches.Rectangle((rectangles[i, 0], rectangles[i, 1]), width=(rectangles[i, 2]-rectangles[i, 0]),
-                                 height=(rectangles[i, 3]-rectangles[i, 1]), linewidth=1, edgecolor='black', facecolor='grey')
-        ax.add_patch(rect)
+
+    # print(rectangles.shape)
+
+    if rect.size !=0 and rect.ndim == 1:
+        rect = np.reshape(rect,(1,4))
+
+    for i in range(rect.shape[0]):
+        rectpatch = patches.Rectangle((rect[i, 0], rect[i, 1]), width=(rect[i, 2]-rect[i, 0]),
+                                 height=(rect[i, 3]-rect[i, 1]), linewidth=1, edgecolor='black', facecolor='grey')
+        ax.add_patch(rectpatch)
     # plt.show()
     camera.snap()
 
@@ -72,8 +78,8 @@ for file in os.listdir(folder):
     filename = os.fsdecode(file)
     if filename.startswith("bacteria"):
         with open(path + filename, "r") as f:
-            data = np.loadtxt(f, ndmin=2)
-            plotAndSnap(data, boundary_data, rectangles)
+            dataB = np.loadtxt(f, ndmin=2)
+            plotAndSnap(dataB, boundary_data, rectangles)
 
 # save animation:
 print("saving animation...")
