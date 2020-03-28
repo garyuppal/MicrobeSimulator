@@ -64,6 +64,7 @@ private:
 	Bacteria::BacteriaHandler<dim>			bacteria;
 	Bacteria::OR_Fitness<dim>				fitness_function;
 		/** @todo type of fitness given by parameter as well */
+	Bacteria::TestNewFitness::Fitness_Function<dim>	 test_ff;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;
@@ -106,6 +107,7 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	:
 	prm(cmd_prm.getParameterFile(), cmd_prm.getJobID()),
 	triangulation(Triangulation<dim>::maximum_smoothing),
+	// test_ff(chemicals, prm),
 	output_directory(cmd_prm.getOutputDirectory()),
 	run_time(0),
 	time(0),

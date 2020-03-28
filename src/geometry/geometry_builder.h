@@ -1299,6 +1299,7 @@ Splitter<dim>::add_splitter_ends(Triangulation<dim>& center,
 * and 3D a cylindrical pipe */
 template<int dim>
 class Cylinder : public BuilderBase<dim>{
+public:
 	// constructor
 	Cylinder(const ParameterHandler& prm);
 
@@ -1307,8 +1308,17 @@ class Cylinder : public BuilderBase<dim>{
 
 	// override virtual methods:
 	void build_geometry(Geometry<dim>& geo) const override; 
-	void build_grid_base(Triangulation<dim>& tria) const override; 
+	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
 	void printInfo(std::ostream& out) const override;
+
+	// boundary labels:
+	// virtual void set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
+	// virtual void set_sphere_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
+	// virtual void set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
+
+	// manifolds:
+	void attach_mesh_manifolds(const Geometry<dim>& geo, Triangulation<dim>& tria) override;
+
 private:
 	double radius;
 
@@ -1361,8 +1371,9 @@ Cylinder<dim>::build_geometry(Geometry<dim>& geo) const
 	}
 	if(dim==3)
 	{
-		bl[2] = 0;
-		tr[2] = length; // extruded in z-direction
+		bl[0] = -0.5*length;
+		tr[0] = 0.5*length; // extruded in x-direction, circle in y-z plane
+					// following deal.ii cylinder builder, putting origin in middle
 	}
 
 	geo.setBottomLeftPoint(bl);
@@ -1376,16 +1387,23 @@ Cylinder<dim>::build_geometry(Geometry<dim>& geo) const
 /** @todo still need to implement, also may need to override boundary labeling and manifolds */
 template<int dim>
 void 
-Cylinder<dim>::build_grid_base(Triangulation<dim>& tria) const
+Cylinder<dim>::build_grid_base(const Geometry<dim>& /* geo */, 
+									Triangulation<dim>& tria) const
 {
-	std::cout << "STILL NEED TO IMPLEMENT CYLINDRICAL GRID" << std::endl;
-		// also sphere interior reflection
-	// extrude to 3d, test with cylindrical advection, may need to modify velocity too
-	// also test vortex
-	// another nice geometry could by filtering by cylindrical shells...
-	// would need to implement hollow cylindrical shell obstacles...
+	dealii::GridGenerator::cylinder(tria, radius, 0.5*length/* half_length */);
 }
 
+/** \brief Manifold assignment for cylinder */
+/* Override manifold assignment since deal.ii grid builder for cylinder already
+* gives proper manifold assignment. 
+*/
+template<int dim>
+void 
+Cylinder<dim>::attach_mesh_manifolds(const Geometry<dim>& /* geo */, 
+										Triangulation<dim>& /* tria */ )
+{}
+
+/** \brief Print info for cylinder geometry builder */
 template<int dim>
 void 
 Cylinder<dim>::printInfo(std::ostream& out) const
@@ -1454,9 +1472,9 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	else if( boost::iequals(geometry_type, "Splitter") )
 		builder = std::make_shared<Splitter<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Cylinder") ) // 2d gives vortex
-		std::cout << "Need to implement" << std::endl;
-	else if( boost::iequals(geometry_type, "File") )
-		std::cout << "Need to implement" << std::endl;
+		builder = std::make_shared<Cylinder<dim> >(prm);
+	// else if( boost::iequals(geometry_type, "File") )
+	// 	std::cout << "Need to implement" << std::endl;
 	else
 		throw std::runtime_error("Invalid geometry type: <" + geometry_type + ">");
 }
@@ -1480,7 +1498,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Filter<dim>::declare_parameters(prm);
 	Mixer<dim>::declare_parameters(prm);
 	Splitter<dim>::declare_parameters(prm);
-	// Cylinder<dim>::declare_parameters(prm);
+	Cylinder<dim>::declare_parameters(prm);
 }
 
 // Main Methods:

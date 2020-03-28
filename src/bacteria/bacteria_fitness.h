@@ -192,5 +192,310 @@ OR_Fitness<dim>::printInfo(std::ostream& out) const
 		<< std::endl << std::endl << std::endl;
 }
 
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+
+namespace TestNewFitness{
+
+// ---------------------------------------------------------------------------------
+// FITNESS BASE: 
+// ---------------------------------------------------------------------------------
+
+/** \brief Fitness function base */
+template<int dim>
+class FitnessBase{
+public:
+	FitnessBase(const Chemicals::ChemicalHandler<dim>& ch);
+	virtual ~FitnessBase() {}
+
+	virtual double value(const Point<dim>& location,
+					const std::vector<double>& rates) const=0;
+
+	virtual void printInfo(std::ostream& out) const=0;
+
+protected:
+	Chemicals::ChemicalHandler<dim> const * chemicals; 
+};
+
+// IMPL
+//------------------------------------------------------------
+
+/** \brief Fitness base constructor */
+template<int dim>
+FitnessBase<dim>::FitnessBase(const Chemicals::ChemicalHandler<dim>& ch)
+	:
+	chemicals(&ch)
+{}
+
+
+
+// ---------------------------------------------------------------------------------
+// OR FITNESS:
+// ---------------------------------------------------------------------------------
+
+/** \brief Fitness base constructor */
+template<int dim>
+class OR_Fitness : public FitnessBase<dim>{
+public:
+	OR_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+			const ParameterHandler& prm);
+
+	static void declare_parameters(ParameterHandler& prm);
+
+	double value(const Point<dim>& location,
+			const std::vector<double>& rates) const override;
+
+	void printInfo(std::ostream& out) const override;
+private:
+	double benefit;
+	double harm;
+
+	double benefit_saturation;
+	double harm_saturation;
+
+	double secretion_cost;
+};
+
+// IMPL
+// ------------------------------------------------
+
+/** \brief OR type fitness constructor */
+template<int dim>
+OR_Fitness<dim>::OR_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+		const ParameterHandler& prm)
+	:
+	FitnessBase<dim>(&ch)
+{
+	std::string subsection = "Fitness.OR";
+
+	benefit = prm.get_double(subsection, "Benefit");
+	harm = prm.get_double(subsection, "Harm");
+	benefit_saturation = prm.get_double(subsection, "Benefit saturation");
+	harm_saturation = prm.get_double(subsection, "Harm saturation");
+	secretion_cost = prm.get_double(subsection, "Secretion cost");	
+}
+
+/** \brief Declare OR fitness type parameters */
+template<int dim>
+void 
+OR_Fitness<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Fitness");
+		prm.enter_subsection("OR");
+			prm.declare_entry("Benefit","0",Patterns::Double());
+			prm.declare_entry("Harm","0",Patterns::Double());
+			prm.declare_entry("Benefit saturation","0",Patterns::Double());
+			prm.declare_entry("Harm saturation","0",Patterns::Double());
+			prm.declare_entry("Secretion cost","0",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+	
+/** \brief Return OR type fitness value */
+template<int dim>
+double 
+OR_Fitness<dim>::value(const Point<dim>& location,
+		const std::vector<double>& rates) const
+{
+	return 0;
+}
+
+/** \brief Display OR type fitness info */
+template<int dim>
+void 
+OR_Fitness<dim>::printInfo(std::ostream& out) const
+{
+	const unsigned int numchem = this->chemicals->getNumberChemicals();
+
+	out << "\n\n" << Utility::medium_line << std::endl
+	    << "\t\tOR FITNESS FUNCTION (for " << numchem << " chemicals)" << std::endl
+	    << Utility::medium_line << std::endl
+	    << "\t public good benefit: " << benefit << std::endl
+	    << "\t waste harm: " << harm << std::endl
+	    << "\t public good saturation: " << benefit_saturation << std::endl
+	    << "\t waste saturation: " << harm_saturation << std::endl
+	    << "\t secretion cost: " << secretion_cost << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
+}
+
+// ---------------------------------------------------------------------------------
+// AND FITNESS:
+// ---------------------------------------------------------------------------------
+
+/** \brief AND type fitness class */
+template<int dim>
+class AND_Fitness : public FitnessBase<dim>{
+public:
+	AND_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+			const ParameterHandler& prm);
+	
+	static void declare_parameters(ParameterHandler& prm);
+	
+	double value(const Point<dim>& location,
+			const std::vector<double>& rates) const override;
+
+	void printInfo(std::ostream& out) const override;
+private:
+	double benefit;
+	double harm;
+
+	double benefit_saturation;
+	double harm_saturation;
+
+	double secretion_cost;
+};
+
+// IMPL
+// ----------------------------------------------------------
+
+/** \brief OR type fitness constructor */
+template<int dim>
+AND_Fitness<dim>::AND_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+		const ParameterHandler& prm)
+	:
+	FitnessBase<dim>(&ch)
+{
+	std::string subsection = "Fitness.OR";
+
+	benefit = prm.get_double(subsection, "Benefit");
+	harm = prm.get_double(subsection, "Harm");
+	benefit_saturation = prm.get_double(subsection, "Benefit saturation");
+	harm_saturation = prm.get_double(subsection, "Harm saturation");
+	secretion_cost = prm.get_double(subsection, "Secretion cost");	
+}
+
+/** \brief Declare AND fitness type parameters */
+template<int dim>
+void 
+AND_Fitness<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Fitness");
+		prm.enter_subsection("AND");
+			prm.declare_entry("Benefit","0",Patterns::Double());
+			prm.declare_entry("Harm","0",Patterns::Double());
+			prm.declare_entry("Benefit saturation","0",Patterns::Double());
+			prm.declare_entry("Harm saturation","0",Patterns::Double());
+			prm.declare_entry("Secretion cost","0",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+template<int dim>
+double 
+AND_Fitness<dim>::value(const Point<dim>& location,
+		const std::vector<double>& rates) const
+{
+	return 0;
+}
+
+/** \brief Display AND type fitness info */
+template<int dim>
+void 
+AND_Fitness<dim>::printInfo(std::ostream& out) const
+{
+	const unsigned int numchem = this->chemicals->getNumberChemicals();
+
+	out << "\n\n" << Utility::medium_line << std::endl
+	    << "\t\tAND FITNESS FUNCTION (for " << numchem << " chemicals)" << std::endl
+	    << Utility::medium_line << std::endl
+	    << "\t public good benefit: " << benefit << std::endl
+	    << "\t waste harm: " << harm << std::endl
+	    << "\t public good saturation: " << benefit_saturation << std::endl
+	    << "\t waste saturation: " << harm_saturation << std::endl
+	    << "\t secretion cost: " << secretion_cost << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
+}
+
+
+// ---------------------------------------------------------------------------------
+// FITNESS HANDLER:
+// ---------------------------------------------------------------------------------
+
+/** \brief Fitness function class */
+template<int dim>
+class Fitness_Function{
+public:
+	Fitness_Function();
+
+	void init(const Chemicals::ChemicalHandler<dim>& ch, 
+			const ParameterHandler& prm);
+
+	static void declare_parameters(ParameterHandler& prm);
+
+	double value(const Point<dim>& location,
+					const std::vector<double>& rates) const;
+
+	void printInfo(std::ostream& out) const;
+
+private:
+	std::shared_ptr<FitnessBase<dim> > 		fitness;
+}; 
+
+// IMPL
+// ----------------------------------------------------------------
+
+/** \brief Fitness function constructor */
+template<int dim>
+Fitness_Function<dim>::Fitness_Function()
+{}
+
+template<int dim>
+void
+Fitness_Function<dim>::init(const Chemicals::ChemicalHandler<dim>& ch, 
+	const ParameterHandler& prm)
+{
+	const std::string section = "Fitness";
+	std::string fitness_type = prm.get_string(section, "Fitness type");
+
+	if( boost::iequals(fitness_type, "OR") )
+		fitness = std::make_shared<OR_Fitness<dim> >(ch, prm);
+	else if( boost::iequals(fitness_type, "AND") )
+		fitness = std::make_shared<AND_Fitness<dim> >(ch, prm);
+	else
+		throw std::runtime_error("Invalid fitness type: <" + fitness_type + ">");
+}
+
+/** \brief Declare fitness parameters */
+template<int dim>
+void 
+Fitness_Function<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Fitness");
+		prm.declare_entry("Fitness type", "OR", Patterns::Selection("OR|AND"));
+	prm.leave_subsection();
+
+	OR_Fitness<dim>::declare_parameters(prm);
+	AND_Fitness<dim>::declare_parameters(prm);
+}
+
+/** \brief Return fitness function value at given location for given secretion rates */
+template<int dim>
+double 
+Fitness_Function<dim>::value(const Point<dim>& location,
+				const std::vector<double>& rates) const
+{
+	fitness->value(location, rates);
+}
+
+/** \brief Display fitness function info */
+template<int dim>
+void 
+Fitness_Function<dim>::printInfo(std::ostream& out) const
+{
+	fitness->printInfo(out);
+}
+
+
+} // test new fitness
+
+
+
+
+
+
+
+
 }} // CLOSE NAMESPACE
 #endif
