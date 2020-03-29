@@ -64,35 +64,38 @@ using dealii::Triangulation;
 	    prm.declare_entry("Global refinement","0",Patterns::Unsigned());
 	    prm.declare_entry("Obstacle refinement","0",Patterns::Unsigned());
 	    prm.declare_entry("Boundary refinement","0",Patterns::Unsigned());
+	    prm.declare_entry("Max cell size","-1",Patterns::Double());
 	  prm.leave_subsection();
 	}
 
 	// CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
 	// --------------------------------------------------------------------------------------
-	/// left boundary id
+	/** left boundary id */
 	static constexpr unsigned int id_left = 0;
-	/// right boundary id
+	/** right boundary id */
 	static constexpr unsigned int id_right = 1;
-	// top boundary id
+	/**  top boundary id */
 	static constexpr unsigned int id_top = 2;
-	// bottom boundary id
+	/** bottom boundary id */
 	static constexpr unsigned int id_bottom = 3;
 
-	// For 3d, front boundary id
+	/** For 3d, front boundary id */
 	static constexpr unsigned int id_front = 4;
-	// For 3d, back boundary id
+	/** For 3d, back boundary id */
 	static constexpr unsigned int id_back = 5;
 
 	// static constexpr unsigned int id_other = 7;
 
-	// first sphere:
+	/** id of first sphere */
 	static constexpr unsigned int id_sphere_begin = 10;
 
-	// first rectangle:
+	/** id of first rectangle */
 	static constexpr unsigned int id_rectangle_begin = 100;
 
 	// arrays for dimension independent access:
+	/** lower faces ids */
 	static constexpr std::array< unsigned int , 3 > lower_ids = {id_left, id_bottom, id_back};
+	/** upper faces ids */
 	static constexpr std::array< unsigned int , 3 > upper_ids = {id_right, id_top, id_front};
 } // NAMESPACE GRIDGENERATIONTOOLS
 
@@ -135,6 +138,7 @@ public:
 	virtual void refine_obstacles(const Geometry<dim>& geo, Triangulation<dim>& tria);
 	virtual void refine_boundary(const Geometry<dim>& geo, Triangulation<dim>& tria);
 	virtual void refine_global(Triangulation<dim>& tria);
+	virtual void refine_largest_cells(Triangulation<dim>& tria);
 
 	void printMeshInfo(std::ostream& out);
 
@@ -144,6 +148,7 @@ protected:
 	unsigned int boundary_refinement;
 
 	double sphere_tolerance;
+	double max_cell_size;
 };
 
 // IMPL
@@ -153,12 +158,14 @@ protected:
 template<int dim>
 BuilderBase<dim>::BuilderBase(const ParameterHandler& prm)
 	:
-	sphere_tolerance(-1)
+	sphere_tolerance(-1),
+	max_cell_size(-1)
 {
 	const std::string section = "Mesh";
 	global_refinement = prm.get_unsigned(section, "Global refinement");
 	obstacle_refinement = prm.get_unsigned(section, "Obstacle refinement");
 	boundary_refinement = prm.get_unsigned(section, "Boundary refinement");
+	max_cell_size = prm.get_double(section, "Max cell size");
 }
 
 /** \brief Set boundary labels for outer faces */
@@ -282,13 +289,6 @@ BuilderBase<dim>::attach_mesh_manifolds(const Geometry<dim>& geo, Triangulation<
 	}
 }
 
-/** \brief Globally refine mesh */
-template<int dim>
-void 
-BuilderBase<dim>::refine_global(Triangulation<dim>& tria)
-{
-	tria.refine_global(global_refinement);
-}
 
 // REFINEMENT:
 // -------------------------
@@ -368,6 +368,53 @@ BuilderBase<dim>::refine_boundary(const Geometry<dim>& geo, Triangulation<dim>& 
 
 	std::cout << "...refined boundary " << boundary_refinement << " times" << std::endl;
 }
+
+/** \brief Globally refine mesh */
+template<int dim>
+void 
+BuilderBase<dim>::refine_global(Triangulation<dim>& tria)
+{
+	tria.refine_global(global_refinement);
+}
+
+/** \brief Refine cells larger than given max_cell_size */
+/** @todo note, may also want option to coarsen very small cells */
+template<int dim>
+void 
+BuilderBase<dim>::refine_largest_cells(Triangulation<dim>& triangulation)
+{
+	if(max_cell_size <= 0)
+		return; 
+
+	unsigned int n_refine;
+	unsigned int iter = 0;
+
+	std::cout << "max cell size: " << max_cell_size << std::endl;
+	do
+	{
+		n_refine = 0; // initially no cells to refine
+
+		for(auto cell : triangulation.active_cell_iterators())
+		{
+
+			if(cell->diameter() > max_cell_size)
+			{
+				// std::cout << "cell diameter: " << cell->diameter() << std::endl;
+				++ n_refine;
+				cell->set_refine_flag();
+			}
+
+		} // for each cell in mesh
+		++iter;
+		std::cout << "refining: " << n_refine << "cells on iteration: " << iter << std::endl;
+		triangulation.execute_coarsening_and_refinement();
+	}while(n_refine != 0); // while there are still cells to refine
+
+	std::cout << "...refined boundary " << boundary_refinement << " times" << std::endl;	
+}
+
+
+// print mesh info:
 
 /** \brief Display mesh refinement info */
 template<int dim>
@@ -1532,6 +1579,7 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	builder->refine_global(tria);
 	builder->refine_obstacles(geo, tria);
 	builder->refine_boundary(geo, tria);
+	builder->refine_largest_cells(tria);
 }
 
 /** \brief Display builder (geometry type) info */

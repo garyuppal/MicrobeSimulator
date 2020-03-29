@@ -2,7 +2,7 @@
 
 set Simulator type = Bacteria
 set Time step = 0.001 
-set Run time = 20.0
+set Run time = 1.0
 set Save period = 0.1
 
 subsection Advection
@@ -24,9 +24,10 @@ subsection Geometry
 end 
 
 subsection Mesh
-	set Global refinement = 6
+	set Global refinement = 1
 	set Obstacle refinement = 0
 	set Boundary refinement = 0
+	set Max cell size = 1.0
 end
 
 subsection Chemicals

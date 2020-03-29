@@ -2,7 +2,7 @@
 
 set Simulator type = Bacteria
 set Time step = 0.001 
-set Run time = 10.0
+set Run time = 0.3
 set Save period = 0.1
 
 subsection Advection
@@ -10,7 +10,7 @@ subsection Advection
 	set Maximum velocity = 2     			
 	set Vortex radius = 0        			
 	set Vortex circulation = 0
-	set Stokes refinement = 3 // note currently gives error if set to 0 and using stokes***
+	set Stokes refinement = 1 // note currently gives error if set to 0 and using stokes***
 end
 
 subsection Geometry
@@ -29,9 +29,10 @@ subsection Geometry
 end 
 
 subsection Mesh
-	set Global refinement = 1
-	set Obstacle refinement = 2
+	set Global refinement = 0
+	set Obstacle refinement = 1
 	set Boundary refinement = 1
+	set Max cell size = 0.5
 end
 
 subsection Chemicals
