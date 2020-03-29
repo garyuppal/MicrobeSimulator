@@ -69,9 +69,9 @@ using dealii::Triangulation;
 
 	// CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
 	// --------------------------------------------------------------------------------------
-	// left boundary id
+	/// left boundary id
 	static constexpr unsigned int id_left = 0;
-	// right boundary id
+	/// right boundary id
 	static constexpr unsigned int id_right = 1;
 	// top boundary id
 	static constexpr unsigned int id_top = 2;
