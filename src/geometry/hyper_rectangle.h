@@ -12,10 +12,7 @@ namespace MicrobeSimulator{
 /** \brief HyperRectangle class for interior rectangular obstacles */
 template<int dim>
 class HyperRectangle{
-  private:
-    Point<dim> bottom_left;
-    Point<dim> top_right;
-  public:
+public:
     HyperRectangle();
     HyperRectangle(const Point<dim>& lower,
       const Point<dim>& upper);
@@ -35,141 +32,143 @@ class HyperRectangle{
     void reflectPoint(const Point<dim>& old_point,
                       Point<dim>& new_point,
                       const double buffer = 0.) const;
-
-  }; // class HyperRectangle{}
+private:
+    Point<dim> bottom_left;
+    Point<dim> top_right;
+}; // class HyperRectangle{}
 
 
 // IMPLEMENTATION
 // -------------------------------------------------------------------
 
-  /** \brief Default constructor */
-  template<int dim>
-  HyperRectangle<dim>::HyperRectangle()
-  {}
+/** \brief Default constructor */
+template<int dim>
+HyperRectangle<dim>::HyperRectangle()
+{}
 
-  /** \brief Constuctor given endpoints */
-  template<int dim>
-  HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
-      const Point<dim>& upper)
-    :
-    bottom_left(lower),
-    top_right(upper)
-  {}
+/** \brief Constuctor given endpoints */
+template<int dim>
+HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
+									const Point<dim>& upper)
+	:
+	bottom_left(lower),
+	top_right(upper)
+{}
 
-  // accessors:
+// accessors:
 
-  /** \brief Return bottom left corner of rectangle */
-  template<int dim>
-  Point<dim> 
-  HyperRectangle<dim>::getBottomLeft() const
-  {
-    return bottom_left;
-  }
+/** \brief Return bottom left corner of rectangle */
+template<int dim>
+Point<dim> 
+HyperRectangle<dim>::getBottomLeft() const
+{
+	return bottom_left;
+}
 
-  /** \brief Return top right corner of rectangle */
-  template<int dim>
-  Point<dim> 
-  HyperRectangle<dim>::getTopRight() const
-  {
-    return top_right;
-  }
+/** \brief Return top right corner of rectangle */
+template<int dim>
+Point<dim> 
+HyperRectangle<dim>::getTopRight() const
+{
+	return top_right;
+}
 
-  // mutators:
+// mutators:
 
-  /** \brief Set bottom left point of rectangle */
-  template<int dim>
-  void 
-  HyperRectangle<dim>::setBottomLeft(const Point<dim>& bl)
-  {
-    bottom_left = bl;
-  }
-  
-  /** \brief Set top right point of rectangle */
-  template<int dim>
-  void 
-  HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
-  {
-    top_right = tr;
-  }
+/** \brief Set bottom left point of rectangle */
+template<int dim>
+void 
+HyperRectangle<dim>::setBottomLeft(const Point<dim>& bl)
+{
+	bottom_left = bl;
+}
 
-  /** \brief Return distance to outer boundary of rectangle */
-  template<int dim>
-  double 
-  HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
-  {
-    /// find minimal distance outside rectangle
-    double distance = 0.; 
+/** \brief Set top right point of rectangle */
+template<int dim>
+void 
+HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
+{
+	top_right = tr;
+}
 
-    Point<dim> center = 0.5*(top_right + bottom_left);
-    Point<dim> half_width = 0.5*(top_right + (-1.)*bottom_left);
+/** \brief Return distance to outer boundary of rectangle */
+template<int dim>
+double 
+HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
+{
+	// find minimal distance outside rectangle
+	double distance = 0.; 
 
+	Point<dim> center = 0.5*(top_right + bottom_left);
+	Point<dim> half_width = 0.5*(top_right + (-1.)*bottom_left);
+
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+	{
+		const double dx = std::max( 
+			std::fabs(p[dim_itr] - center[dim_itr]) - half_width[dim_itr], 0.);
+
+		distance += (dx*dx);
+	}
+
+	return std::sqrt(distance);
+}
+
+/** \brief Reflect point off of rectangle
+*/
+template<int dim>
+void 
+HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
+                              Point<dim>& new_point,
+                              const double buffer) const
+{
     for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
     {
-      const double dx = std::max( std::fabs(p[dim_itr] - center[dim_itr]) -
-          half_width[dim_itr], 0.);
+    	// buffer should be consistent with check!!
+	    const double edge_tolerance = 1e-8 + buffer; 
 
-      distance += (dx*dx);
-    }
+	    // dont add buffer to left (x = dim 0 and from below):
+	    double fb_edge_tolerance = edge_tolerance;
+	    if(dim_itr == 0) 
+	    	fb_edge_tolerance = 1e-8;
 
-    return std::sqrt(distance);
-  }
+		const bool from_below = (old_point[dim_itr] < (bottom_left[dim_itr] - fb_edge_tolerance) ) && 
+		                  (new_point[dim_itr] > (bottom_left[dim_itr] - fb_edge_tolerance) ); 
 
-  /** \brief Reflect point off of rectangle
-  */
-  template<int dim>
-  void 
-  HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
-                                  Point<dim>& new_point,
-                                  const double buffer) const
-  {
-    const double edge_tolerance = 1e-8 + buffer; 
-    
-    /// @ todo implement buffer for rectangle reflect point
-    for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
-    {
-      /// check if point came from lower or above end along this dimension
-      const bool from_below = (old_point[dim_itr] < (bottom_left[dim_itr] - edge_tolerance) ) && 
-                              (new_point[dim_itr] > (bottom_left[dim_itr] - edge_tolerance) ); 
+		const bool from_above = (new_point[dim_itr] < (top_right[dim_itr] + edge_tolerance) ) &&
+		                  (old_point[dim_itr] > (top_right[dim_itr] + edge_tolerance) );
 
-      const bool from_above = (new_point[dim_itr] < (top_right[dim_itr] + edge_tolerance) ) &&
-                              (old_point[dim_itr] > (top_right[dim_itr] + edge_tolerance) );
+		if(from_below) // including from left
+		{ 
+			// delta should already be positive, but in case not, use fabs:
+			const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr] + fb_edge_tolerance) ;
+			new_point[dim_itr] = new_point[dim_itr] - 2.*delta;
+		}
+		else if(from_above)
+		{
+			const double delta = std::fabs(top_right[dim_itr] + edge_tolerance - new_point[dim_itr]);
+			new_point[dim_itr] = new_point[dim_itr] + 2.*delta;
+		}
+		// else do nothing 
+	} // for each dimension
+} // reflect point incident on rectangle
 
-      if(from_below) // including from left
-      { 
-        // delta should already be positive, but in case not, use fabs:
-        double use_buffer = buffer;
-        if(dim_itr == 0)
-          use_buffer = 0; // dont add buffer to left (x = dim 0)
-        const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr]) + 0.5*use_buffer;
-        new_point[dim_itr] = new_point[dim_itr] - 2.*delta;
-      }
-      else if(from_above)
-      {
-        const double delta = std::fabs(top_right[dim_itr] - new_point[dim_itr]) + 0.5*buffer;
-        new_point[dim_itr] = new_point[dim_itr] + 2.*delta;
-      }
-      // else do nothing
-    } // for each dimension
+/** \brief Get unit vector normal to rectangle in direction of supplied point */
+template<int dim>
+Tensor<1, dim> 
+HyperRectangle<dim>::getNormalVector(const Point<dim>& p) const
+{
+	Tensor<1, dim> normal;
 
-  } // reflect point incident on rectangle
+	// find direction:
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+		if( p[dim_itr] >= top_right[dim_itr] )
+			normal[dim_itr] = 1.;
+		else if( p[dim_itr] <= bottom_left[dim_itr])
+			normal[dim_itr] = -1.;
 
-  /** \brief Get unit vector normal to rectangle in direction of supplied point */
-  template<int dim>
-  Tensor<1, dim> 
-  HyperRectangle<dim>::getNormalVector(const Point<dim>& p) const
-  {
-    Tensor<1, dim> normal;
-
-    // find direction:
-    for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
-      if( p[dim_itr] >= top_right[dim_itr] )
-        normal[dim_itr] = 1.;
-      else if( p[dim_itr] <= bottom_left[dim_itr])
-        normal[dim_itr] = -1.;
-
-    normal /= normal.norm();
-    return normal; 
-  }
+	normal /= normal.norm();
+	return normal; 
+}
 
 
 } // close namespace

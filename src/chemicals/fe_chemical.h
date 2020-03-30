@@ -150,7 +150,6 @@ FE_Chemical<dim>::value(const Point<dim>& p) const
     // 	 						value);
 
     // return value(0);
-
     return dealii::VectorTools::point_value(chemical_base->get_dof_handler(),
     										solution,
     										p);

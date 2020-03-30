@@ -313,12 +313,12 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 			break;
 		}
 
-	// check interior rectangles:
+	// check interior rectangles: // buffer optional
 	unsigned int number_rectangles = rectangles.size();
 	for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
-		if( (rectangles[rect_id].distance_from_border(newPoint) - buffer) < tolerance ) // add buffer here too!!
+		if( (rectangles[rect_id].distance_from_border(newPoint) - buffer) < tolerance ) 
 		{
-			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); // buffer optional
+			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); 
 			break;        
 		}
 
