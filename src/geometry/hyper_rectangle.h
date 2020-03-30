@@ -115,6 +115,9 @@ HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
 
 /** \brief Reflect point off of rectangle
 */
+/** @todo still buggy, not catching all points entering from right side 
+* ...top and bottom seem ok?
+*/
 template<int dim>
 void 
 HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
