@@ -25,7 +25,7 @@ public:
     void setBottomLeft(const Point<dim>& bl);
     void setTopRight(const Point<dim>& tr);
 
-    double distance_from_border(const Point<dim>& p) const;
+    double distance_from_border(const Point<dim>& p, double buffer=0) const;
 
     Tensor<1, dim> getNormalVector(const Point<dim>& p) const;
 
@@ -35,6 +35,7 @@ public:
 private:
     Point<dim> bottom_left;
     Point<dim> top_right;
+
 }; // class HyperRectangle{}
 
 
@@ -94,7 +95,7 @@ HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
 /** \brief Return distance to outer boundary of rectangle */
 template<int dim>
 double 
-HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
+HyperRectangle<dim>::distance_from_border(const Point<dim>& p, double buffer) const
 {
 	// find minimal distance outside rectangle
 	double distance = 0.; 
@@ -105,37 +106,35 @@ HyperRectangle<dim>::distance_from_border(const Point<dim>& p) const
 	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
 	{
 		const double dx = std::max( 
-			std::fabs(p[dim_itr] - center[dim_itr]) - half_width[dim_itr], 0.);
+			std::fabs(p[dim_itr] - center[dim_itr]) - (half_width[dim_itr] + buffer), 0.);
 
 		distance += (dx*dx);
 	}
 
+	/** @todo double check ... */
 	return std::sqrt(distance);
 }
 
 /** \brief Reflect point off of rectangle
-*/
-/** @todo still buggy, not catching all points entering from right side 
-* ...top and bottom seem ok?
 */
 template<int dim>
 void 
 HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
                               Point<dim>& new_point,
                               const double buffer) const
-{
+{	
     for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
     {
-    	// buffer should be consistent with check!!
+    	// buffer should be consistent with check
 	    const double edge_tolerance = 1e-8 + buffer; 
 
 	    // dont add buffer to left (x = dim 0 and from below):
-	    double fb_edge_tolerance = edge_tolerance;
-	    if(dim_itr == 0) 
-	    	fb_edge_tolerance = 1e-8;
+	    // double fb_edge_tolerance = edge_tolerance;
+	    // if(dim_itr == 0) 
+	    // 	fb_edge_tolerance = 1e-8;
 
-		const bool from_below = (old_point[dim_itr] < (bottom_left[dim_itr] - fb_edge_tolerance) ) && 
-		                  (new_point[dim_itr] > (bottom_left[dim_itr] - fb_edge_tolerance) ); 
+		const bool from_below = (old_point[dim_itr] < (bottom_left[dim_itr] - edge_tolerance) ) && 
+		                  (new_point[dim_itr] > (bottom_left[dim_itr] - edge_tolerance) ); 
 
 		const bool from_above = (new_point[dim_itr] < (top_right[dim_itr] + edge_tolerance) ) &&
 		                  (old_point[dim_itr] > (top_right[dim_itr] + edge_tolerance) );
@@ -143,7 +142,7 @@ HyperRectangle<dim>::reflectPoint(const Point<dim>& old_point,
 		if(from_below) // including from left
 		{ 
 			// delta should already be positive, but in case not, use fabs:
-			const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr] + fb_edge_tolerance) ;
+			const double delta = std::fabs(new_point[dim_itr] - bottom_left[dim_itr] + edge_tolerance) ;
 			new_point[dim_itr] = new_point[dim_itr] - 2.*delta;
 		}
 		else if(from_above)

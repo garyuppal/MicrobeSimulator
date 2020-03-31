@@ -313,11 +313,11 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 			break;
 		}
 
-	// check interior rectangles: // buffer optional
+	// check interior rectangle,  buffer optional
 	unsigned int number_rectangles = rectangles.size();
 	for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
-		if( (rectangles[rect_id].distance_from_border(newPoint) - buffer) < tolerance ) 
-		{
+		if( rectangles[rect_id].distance_from_border(newPoint, buffer) < tolerance ) 
+		{		
 			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); 
 			break;        
 		}
@@ -370,7 +370,7 @@ Geometry<dim>::isInDomain(const Point<dim>& location, double buffer) const
 	// check interior rectangles:
 	unsigned int number_rectangles = rectangles.size();
 	for(unsigned int rect = 0; rect < number_rectangles; ++rect)
-	 	if(rectangles[rect].distance_from_border(location) + buffer < 1e-8)
+	 	if( rectangles[rect].distance_from_border(location, buffer) < 1e-8)
 	   		return false;
 
 	return true;
@@ -399,6 +399,7 @@ Geometry<dim>::addPointBuffer(const double buffer, const Point<dim>& test_point,
 	for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
 		if( rectangles[rect_id].distance_from_border(buffered_point) < buffer )
 		{
+			/** @todo double check this */
 			// add buffer to appropriate direction ...
 			Tensor<1, dim> normal_vector = rectangles[rect_id].getNormalVector(buffered_point);
 			buffered_point += (buffer*normal_vector);
