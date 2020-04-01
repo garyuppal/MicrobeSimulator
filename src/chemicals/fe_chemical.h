@@ -52,7 +52,7 @@ public:
 	// methods:
 	void 	project_initial_condition(const Function<dim>& initial_condition); // done
 
-	double 	getMass() const; // done 
+	double 	getMass() const override; // done 
 	double 	getMin() const; // done // for debugging -- using min/max of vector for now...
 	double 	getMax() const; // done // for debugging -- using min/max of vector for now...
 

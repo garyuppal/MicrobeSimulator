@@ -12,6 +12,8 @@ import sys
 from celluloid import Camera
 
 dataDir = sys.argv[1] 
+dataDir = dataDir.rstrip('/')
+
 path = os.path.dirname(os.path.realpath(__file__)) + "/" + dataDir + "/"
 
 if len(sys.argv) == 3:
@@ -19,7 +21,7 @@ if len(sys.argv) == 3:
     if not video_name.endswith(".gif"):
         video_name = video_name + ".gif"
 else:
-    video_name = 'bacteria.gif'
+    video_name = "video_" + dataDir + "_v.gif"
 
 # plot_folder =
 folder = os.fsencode(path)

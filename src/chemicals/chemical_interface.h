@@ -35,6 +35,8 @@ namespace MicrobeSimulator{ namespace Chemicals{
 
 		virtual double getTimeStep() const = 0;
 
+		virtual double getMass() const = 0;
+
 		virtual void print(std::ostream& out, unsigned int chem_id) const = 0; 
 		virtual void printInfo(std::ostream& out) const = 0;
 	}; 

@@ -78,9 +78,11 @@ private:
 	unsigned int 							bacteria_time_step_multiplier;
 	unsigned int 							number_reintroduced; // for adding in new groups
 
+
 	// output:
 	void output_bacteria() const;
 	void output_chemicals(bool isGridSave) const;
+	void output_chemical_mass() const;
 
 	// update:
 	void update_bacteria();
@@ -96,6 +98,12 @@ private:
 
 	// Simulators:
 	void run_microbes();
+
+	void run_chemicals_only(); // for debugging purposes
+
+	// // DEBUGGING METHODS:
+	// void setup_debug();
+	// void run_debug(); 
 };
 
 // IMPL
@@ -125,8 +133,23 @@ void
 FullSimulator<dim>::run()
 {
 	setup_system();
+
+	// options here to run other simulations:
+
 	run_microbes();
 }
+
+// /** \brief Read in parameter file with debugging options
+// * and run tests*/
+// * @todo currently using a top down approach. would be nice to have unit tests
+// * and build up, running them here. maybe add later... 
+// template<int dim>
+// void
+// FullSimulator<dim>::run_tests()
+// {
+// 	setup_debug();
+// 	run_debug();
+// }
 
 /** \brief Run evolving microbe simulation */
 template<int dim>
@@ -142,6 +165,7 @@ FullSimulator<dim>::run_microbes()
 	const unsigned int modsave
 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
 	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
 	const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
 
 	// spread out initial bacteria:
@@ -170,6 +194,8 @@ FullSimulator<dim>::run_microbes()
 			std::cout << "saving at time: " << time << std::endl;
 			if(isSavingChemicals)
 				output_chemicals(isGridSave);
+			if(recordMass)
+				output_chemical_mass();
 			output_bacteria();
 			++save_step_number;
 		}
@@ -259,6 +285,20 @@ FullSimulator<dim>::output_chemicals(bool isGridSave) const
 		chemicals.output_grid(output_directory, save_step_number, geometry);
 	else
 		chemicals.output(output_directory, save_step_number);
+}
+
+template<int dim>
+void
+FullSimulator<dim>::output_chemical_mass() const
+{
+	std::string outfile = output_directory
+					+ "/chemical_masses_"
+					+ dealii::Utilities::int_to_string(save_step_number,4)
+					+ ".dat";
+	std::ofstream out(outfile);
+
+	for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+		out << chemicals[i].getMass() << std::endl;
 }
 
 
@@ -399,6 +439,12 @@ FullSimulator<dim>::declare_parameters()
 	prm.declare_entry("Save period","1",Patterns::Double());
 	prm.declare_entry("Output directory","./",Patterns::Anything());
 
+	// parameters for debugging: (only need to read in if in debug mode)
+	prm.enter_subsection("Debug");
+		prm.declare_entry("Chemicals only","False",Patterns::Bool());
+		prm.declare_entry("Record chemical mass","False",Patterns::Bool());
+	prm.leave_subsection();
+
 	// declare class based parameters:
 	Velocity::AdvectionHandler<dim>::declare_parameters(prm);
 	GeometryTools::GeometryBuilder<dim>::declare_parameters(prm);
@@ -408,6 +454,29 @@ FullSimulator<dim>::declare_parameters()
 	Bacteria::Fitness::declare_parameters(prm);
 }
 
+
+// -----------------------------------------------------------------------------------
+// TESTS
+// -----------------------------------------------------------------------------------
+
+// /** \brief setup system with debug parameters */
+// template<int dim>
+// void 
+// FullSimulator<dim>::setup_debug()
+// {
+// 	declare_parameters(); // declare the usual parameters
+
+// 	// debugging parameters:
+// 	// better to just incorporate into current simulators, so we dont need to redo too much
+// }
+
+// /** \brief run debugging tests */
+// template<int dim>
+// void 
+// FullSimulator<dim>::run_debug()
+// {
+
+// }
 
 } // close namespace
 #endif
