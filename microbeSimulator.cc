@@ -14,10 +14,15 @@
 // *************************************************************************************
 // todo:
 
+// MASS SEEMS TO CHANGE AS WE CROSS DIFFERENT REFINEMENT AREAS
+// not sure if this is due to wrong integration or actual bug
+// *** check also by getting chemical values at location of microbe over time
+// also test without flow, but perhaps small flow for microbes only...
+
 // - add easy chemical debug ...
 // change debug option in cmdprm to just a fixed seed option
 
-// - add a DG implementation???
+// - add a DG implementation??? // refactor chemicals	
 
 // build tests to be sure of the following:
 // 1) figure out if sticking is an issue
@@ -55,22 +60,17 @@ int main(int argc, char** argv)
 		auto start = high_resolution_clock::now();
 
 		// parse command line (also creates output directory):
-		CommandLineParameters cmd_prm(argc,argv);
+		const CommandLineParameters cmd_prm(argc,argv);
 		cmd_prm.print(std::cout);
+		cmd_prm.output();
 
-		unsigned int seed;
-		if(cmd_prm.isDebug())
-		{
-			// fix seed:	
-			seed = 101;
-			std::cout << "Using Fixed Seed: " << seed << std::endl;
-		}
+		unsigned int seed = 0;
+		if(cmd_prm.isSeed())
+			seed = cmd_prm.getSeed(); // fix seed
 		else
-		{
-			// initialze random seed
-			const unsigned int seed =  time(0) + cmd_prm.getJobID(); 
-			std::cout << "Using Seed: " << seed << std::endl;
-		}
+			seed =  time(0) + cmd_prm.getJobID(); // initialze random seed
+
+		std::cout << "Using Random Seed: " << seed << std::endl;
 		srand(seed);
 
 

@@ -17,8 +17,8 @@ class CommandLineParameters{
 public:
 	CommandLineParameters(int argc, char** argv);
 
-	void create_output_directory();
 	void print(std::ostream& out) const;
+	void output() const;
 
 	// ACCESSORS:
 	std::string getParameterFile() const {return parameter_file;}
@@ -26,7 +26,9 @@ public:
 	unsigned int getDimension() const {return dimension;}
 	std::string getOutputTag() const {return output_tag;}
 	std::string getOutputDirectory() const {return output_directory;}
-	bool isDebug() const {return debug;}
+	bool isSeed() const {return seed_set;}
+	unsigned int getSeed() const {return seed;}
+
 private:
 	std::string parameter_file;
 	unsigned int job_ID;
@@ -35,9 +37,11 @@ private:
 	std::string output_directory;
 	bool create_directory;
 
-	bool debug;
+	bool seed_set;
+	unsigned int seed;
 
 	void parse(int argc, char** argv);
+	void create_output_directory();
 };
 
 // IMPL
@@ -50,7 +54,8 @@ CommandLineParameters::CommandLineParameters(int argc, char** argv)
 	output_tag(""),
 	output_directory("./"),
 	create_directory(true),
-	debug(false)
+	seed_set(false),
+	seed(0)
 {
 	parse(argc,argv);
 
@@ -70,7 +75,7 @@ void CommandLineParameters::parse(int argc, char** argv)
 		      << "\t -id \"job id\" \n"
 		      << "\t -d \"dimension\" \n" 
 		      << "\t -dim \"dimension\" \n" 
-  		      << "\t -debug \"debugging parameter file\" \n" 
+  		      << "\t -seed \"random seed number\" \n" 
 		      << "\t -od \"0 or 1\" \n" << std::endl;
 
 	std::cout << "\n\n...Parsing command line\n" << std::endl;
@@ -88,7 +93,7 @@ void CommandLineParameters::parse(int argc, char** argv)
 			else if(flag.compare("-d") == 0) { dimension = atoi(argv[i+1]); }
 			else if(flag.compare("-dim") == 0) { dimension = atoi(argv[i+1]); }
 			else if(flag.compare("-od") == 0) { create_directory = Utility::stringToBool(argv[i+1]); }
-			else if(flag.compare("-debug") == 0) { parameter_file = argv[i+1]; debug=true; }
+			else if(flag.compare("-seed") == 0) { seed_set=true; seed = atoi(argv[i+1]); }
 			else
 			{  
 				throw std::invalid_argument(message.str()); 
@@ -126,10 +131,17 @@ void CommandLineParameters::print(std::ostream& out) const
 		<< "Parameter File: " << parameter_file << std::endl
 		<< "Job ID: " << job_ID << std::endl
 		<< "Dimension: " << dimension << std::endl
-		<< "Output Directory: " << output_directory << std::endl
-		<< "Debug: " << Utility::boolToString(debug) << std::endl
-		<< Utility::medium_line << std::endl
+		<< "Output Directory: " << output_directory << std::endl;
+		if(seed_set)
+			out << "Seed: " << seed << std::endl;
+	out << Utility::medium_line << std::endl
 		<< std::endl << std::endl;
+}
+
+void CommandLineParameters::output() const
+{
+	std::ofstream out(output_directory + "/command_line_parameters.txt");
+	this->print(out);
 }
 
 } // CLOSE NAMESPACE

@@ -81,8 +81,10 @@ private:
 
 	// output:
 	void output_bacteria() const;
-	void output_chemicals(bool isGridSave) const;
+	void output_chemicals() const;
 	void output_chemical_mass() const;
+	void output_local_chemicals() const;
+
 
 	// update:
 	void update_bacteria();
@@ -90,6 +92,8 @@ private:
 
 	// setup:
 	void declare_parameters();
+	void setup_parameters();
+	void setup_geometry_grid();
 	void setup_system(); 
 	void assign_local_parameters();
 	void setup_time_steps();
@@ -132,24 +136,26 @@ template<int dim>
 void
 FullSimulator<dim>::run()
 {
-	setup_system();
+	setup_parameters();
 
-	// options here to run other simulations:
+	const bool gridOnly = prm.get_bool("Debug", "Grid only");
+	const bool chemicalsOnly = prm.get_bool("Debug", "Chemicals only");
 
-	run_microbes();
+	// options here to run other simulations/tests:
+	if(gridOnly)
+	{
+		setup_geometry_grid();
+	}
+	else if(chemicalsOnly)
+	{
+		run_chemicals_only();
+	}
+	else
+	{
+		setup_system();
+		run_microbes();
+	}
 }
-
-// /** \brief Read in parameter file with debugging options
-// * and run tests*/
-// * @todo currently using a top down approach. would be nice to have unit tests
-// * and build up, running them here. maybe add later... 
-// template<int dim>
-// void
-// FullSimulator<dim>::run_tests()
-// {
-// 	setup_debug();
-// 	run_debug();
-// }
 
 /** \brief Run evolving microbe simulation */
 template<int dim>
@@ -166,7 +172,9 @@ FullSimulator<dim>::run_microbes()
 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
 	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
-	const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
+	const bool trackMicrobeChem = prm.get_bool("Debug","Track microbe chemicals");
+
+	// const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
 
 	// spread out initial bacteria:
 	const unsigned int intial_spread = 15;
@@ -193,9 +201,12 @@ FullSimulator<dim>::run_microbes()
 		{
 			std::cout << "saving at time: " << time << std::endl;
 			if(isSavingChemicals)
-				output_chemicals(isGridSave);
+				output_chemicals();
 			if(recordMass)
 				output_chemical_mass();
+			if(trackMicrobeChem)
+				output_local_chemicals();
+
 			output_bacteria();
 			++save_step_number;
 		}
@@ -229,6 +240,13 @@ FullSimulator<dim>::run_microbes()
 		SimulationTools::output_vector(bacteria.get_pg_rates(),
 			"pg_rates",output_directory);
 } // run_microbes()
+
+template<int dim>
+void
+FullSimulator<dim>::run_chemicals_only()
+{
+	std::cout << "still need to implement" << std::endl;
+}
 
 /** \brief Method to reintoduce new microbe groups into simulation */
 template<int dim>
@@ -279,14 +297,27 @@ FullSimulator<dim>::output_bacteria() const
 /** \brief Output chemical fields to file in simulation output directory */
 template<int dim>
 void
-FullSimulator<dim>::output_chemicals(bool isGridSave) const
+FullSimulator<dim>::output_chemicals() const
 {
-	if(isGridSave)
-		chemicals.output_grid(output_directory, save_step_number, geometry);
-	else
+	std::string save_type = prm.get_string("Chemicals","Save type");
+
+	if( boost::iequals(save_type, "VTK") )
+	{
 		chemicals.output(output_directory, save_step_number);
+	}
+	else if( boost::iequals(save_type, "Grid"))
+	{
+		chemicals.output_grid(output_directory, save_step_number, geometry);
+	}
+	else if( boost::iequals(save_type, "Both") )
+	{
+		chemicals.output(output_directory, save_step_number);
+		chemicals.output_grid(output_directory, save_step_number, geometry);
+	}
 }
 
+/** \brief Output integral of chemical field over space 
+* (primarily for debugging) */
 template<int dim>
 void
 FullSimulator<dim>::output_chemical_mass() const
@@ -301,9 +332,67 @@ FullSimulator<dim>::output_chemical_mass() const
 		out << chemicals[i].getMass() << std::endl;
 }
 
+/** \brief Output local chemical concentration for each microbe 
+* (primarily for debugging) */
+template<int dim>
+void
+FullSimulator<dim>::output_local_chemicals() const
+{
+	const unsigned int nc = chemicals.getNumberChemicals();
+
+	std::vector< Point<dim> > locations = bacteria.getAllLocations();
+	for(unsigned int c = 0; c < nc; ++c)
+	{
+		std::vector<double> local_chems( chemicals[c].value_list(locations) );
+
+		std::string outFile = output_directory 
+				+ "/local_chem" 
+				+ dealii::Utilities::int_to_string(c, 2)
+				+ "_"
+				+ dealii::Utilities::int_to_string(save_step_number, 4)
+				+ ".dat";
+		std::ofstream out(outFile);
+
+		for(unsigned int b = 0; b < local_chems.size(); ++b)
+			out << locations[b] << " " << local_chems[b] << std::endl;
+	}
+}
 
 // SETUP:
 // ------------------------------------------------------------------------
+
+/** \brief Setup system parameters and read in from file */
+template<int dim>
+void
+FullSimulator<dim>::setup_parameters()
+{
+	std::cout << "...setting up parameters" << std::endl;
+
+	declare_parameters(); 
+	prm.parse_parameter_file();
+	prm.print_simple(std::cout);
+	std::ofstream out(output_directory + "/parameters.dat");
+	prm.print(out);
+	prm.printLoopedParameterGrid(std::cout);
+	assign_local_parameters();
+}
+
+/** \brief setup and output geometry and mesh grid */
+template<int dim>
+void
+FullSimulator<dim>::setup_geometry_grid()
+{
+	std::cout << "...setting up geometry" << std::endl;
+		GeometryTools::GeometryBuilder<dim> geo_bldr(prm);
+		geo_bldr.printInfo(std::cout);
+		geo_bldr.build_geometry(geometry);
+		geometry.printInfo(std::cout);
+		geometry.outputGeometry(output_directory);
+
+	std::cout << "...setting up grid" << std::endl;
+		geo_bldr.build_grid(geometry, triangulation);
+		GridGenerationTools::output_grid(output_directory,"before_stokes_grid",triangulation);
+}
 
 /** \brief Setup simulation system */
 /** Read in parameters, construct and intialize required objects,
@@ -315,31 +404,14 @@ FullSimulator<dim>::setup_system()
 {
 	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
 
-	std::cout << "...setting up parameters" << std::endl;
+	setup_geometry_grid();
 
-	declare_parameters(); 
-	prm.parse_parameter_file();
-	prm.print_simple(std::cout);
-	std::ofstream out(output_directory + "/parameters.dat");
-	prm.print(out);
-	prm.printLoopedParameterGrid(std::cout);
-	assign_local_parameters();
-
-	std::cout << "...setting up geometry" << std::endl;
-		GeometryTools::GeometryBuilder<dim> geo_bldr(prm);
-		geo_bldr.printInfo(std::cout);
-		geo_bldr.build_geometry(geometry);
-		geometry.printInfo(std::cout);
-		geometry.outputGeometry(output_directory);
-
-	std::cout << "...setting up grid" << std::endl;
-		geo_bldr.build_grid(geometry, triangulation);
-		GridGenerationTools::output_grid(output_directory,"before_stokes_grid",triangulation);
-
+// setup velocity:
 	std::cout << "...setting up velocity" << std::endl;
 		velocity_function.init(prm,geometry,triangulation,output_directory);
 		GridGenerationTools::output_grid(output_directory,"after_stokes_grid",triangulation);
 
+// setup chemicals:
 	std::cout << "...setting up time steps" << std::endl;
 		setup_time_steps();
 		std::cout << "\t...using chemical time step: " << chemical_time_step << std::endl;
@@ -354,6 +426,7 @@ FullSimulator<dim>::setup_system()
 		control_functions.setup(prm);
 		control_functions.printInfo(std::cout);
 
+// setup bacteria:
 	std::cout << "...setting up bacteria" << std::endl;
 		bacteria.init(prm, geometry);
 		bacteria.printInfo(std::cout);
@@ -442,7 +515,9 @@ FullSimulator<dim>::declare_parameters()
 	// parameters for debugging: (only need to read in if in debug mode)
 	prm.enter_subsection("Debug");
 		prm.declare_entry("Chemicals only","False",Patterns::Bool());
+		prm.declare_entry("Grid only","False",Patterns::Bool());
 		prm.declare_entry("Record chemical mass","False",Patterns::Bool());
+		prm.declare_entry("Track microbe chemicals","False",Patterns::Bool());
 	prm.leave_subsection();
 
 	// declare class based parameters:
@@ -453,30 +528,6 @@ FullSimulator<dim>::declare_parameters()
 	Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
 	Bacteria::Fitness::declare_parameters(prm);
 }
-
-
-// -----------------------------------------------------------------------------------
-// TESTS
-// -----------------------------------------------------------------------------------
-
-// /** \brief setup system with debug parameters */
-// template<int dim>
-// void 
-// FullSimulator<dim>::setup_debug()
-// {
-// 	declare_parameters(); // declare the usual parameters
-
-// 	// debugging parameters:
-// 	// better to just incorporate into current simulators, so we dont need to redo too much
-// }
-
-// /** \brief run debugging tests */
-// template<int dim>
-// void 
-// FullSimulator<dim>::run_debug()
-// {
-
-// }
 
 } // close namespace
 #endif

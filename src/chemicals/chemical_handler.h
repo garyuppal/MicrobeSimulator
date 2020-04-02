@@ -113,7 +113,7 @@ ChemicalHandler<dim>::declare_parameters(ParameterHandler& prm)
 							"{50,15}",
 							Patterns::List(Patterns::Double()));
 		prm.declare_entry("Save chemicals", "False",Patterns::Bool());
-		prm.declare_entry("Grid save","False",Patterns::Bool());
+		prm.declare_entry("Save type","VTK", Patterns::Selection("VTK|Grid|Both"));
 		prm.declare_entry("Time step factor", "1", Patterns::Double());
 		prm.declare_entry("Viscosity beta","1",Patterns::Double());
 	prm.leave_subsection();
