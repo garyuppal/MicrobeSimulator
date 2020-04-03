@@ -458,6 +458,10 @@ private:
 	Point<dim> upper;
 
 	std::array<BoundaryCondition, dim> boundary_conditions; 
+
+	int n_refineCenter;
+
+	void refine_center(Triangulation<dim>& tria) const;
 };
 
 // IMPL
@@ -466,7 +470,8 @@ private:
 template<int dim>
 Box<dim>::Box(const ParameterHandler& prm)
 	:
-	BuilderBase<dim>(prm)
+	BuilderBase<dim>(prm),
+	n_refineCenter(-1) // for debugging hanging nodes
 {
 	const std::string section = "Geometry.Box";
 	std::vector<double> b = prm.get_double_vector(section, "Bottom left");
@@ -483,6 +488,8 @@ Box<dim>::Box(const ParameterHandler& prm)
 
 		boundary_conditions[i] = stringToBoundaryCondition(bcs[i]);
 	}
+
+	n_refineCenter = prm.get_int("Debug", "RefineBoxCenter");
 }
 
 // class parameters:
@@ -500,6 +507,10 @@ Box<2>::declare_parameters(ParameterHandler& prm)
 			          Patterns::List(Patterns::Selection("WRAP|REFLECT|OPEN")),
 			          "Boundary conditions.");
 		prm.leave_subsection();
+	prm.leave_subsection();
+
+	prm.enter_subsection("Debug");
+		prm.declare_entry("RefineBoxCenter", "-1", Patterns::Integer());
 	prm.leave_subsection();
 }
 
@@ -558,6 +569,38 @@ Box<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tr
 	std::cout << "...generating hyper rectangle" << std::endl;
 	dealii::GridGenerator::subdivided_hyper_rectangle(tria, repetitions, lower, upper,
 			                                        /*colorize*/ false); // relabeling anyways
+
+	// for debugging:
+	if(n_refineCenter > 0)
+		refine_center(tria);
+}
+
+/** \brief Refine center third portion of mesh as many times as given.
+* Mainly use to debug effects of hanging nodes or transitions in mesh refinement
+*/
+template<int dim>
+void
+Box<dim>::refine_center(Triangulation<dim>& triangulation) const
+{
+	const double third = (upper[0] - lower[0])/3.0;
+	const double left = lower[0] + third;
+	const double right = lower[0] + 2.0*third;
+
+	// refine center in x direction
+	for(unsigned int i = 0; i < n_refineCenter; ++i)
+	{
+		for(auto cell : triangulation.active_cell_iterators())
+		{
+			// mark cells in center third:
+			if( (cell->center()[0] >= left) &&
+					(cell->center()[0] <= right) )
+				cell->set_refine_flag();
+		} // for each cell in mesh
+
+		triangulation.execute_coarsening_and_refinement();
+	} // for n_refineCenter steps
+
+	std::cout << "...refined center " << n_refineCenter << " times" << std::endl;		
 }
 
 /** \brief Print info for box builder */

@@ -13,6 +13,8 @@ using dealii::Triangulation;
 #include "../utility/parameter_handler.h"
 #include "../utility/command_line_parser.h"
 
+#include "./test_functions.h"
+
 #include <array>
 #include <algorithm>
 #include <deal.II/base/function.h>
@@ -40,7 +42,6 @@ namespace MicrobeSimulator{
 				out << vec[i] << std::endl;
 		}
 	} // close SimulationTools namespace
-
 
 /** \brief Simulator class
 * This class handles reading in parameters, constructing, and executing the simulation.
@@ -92,8 +93,12 @@ private:
 
 	// setup:
 	void declare_parameters();
-	void setup_parameters();
-	void setup_geometry_grid();
+		void setup_parameters();
+		void setup_geometry_grid();
+		void setup_velocity();
+		void setup_chemicals();
+		void setup_bacteria();
+
 	void setup_system(); 
 	void assign_local_parameters();
 	void setup_time_steps();
@@ -104,7 +109,9 @@ private:
 	void run_microbes();
 
 	void run_chemicals_only(); // for debugging purposes
+		void intialize_chemicals(); 
 
+	void run_convergence_check();
 	// // DEBUGGING METHODS:
 	// void setup_debug();
 	// void run_debug(); 
@@ -123,7 +130,7 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 	output_directory(cmd_prm.getOutputDirectory()),
 	run_time(0),
 	time(0),
-	chemical_time_step(1),
+	chemical_time_step(1),	
 	bacteria_time_step(1),
 	save_step_number(0),
 	time_step_number(0),
@@ -140,6 +147,7 @@ FullSimulator<dim>::run()
 
 	const bool gridOnly = prm.get_bool("Debug", "Grid only");
 	const bool chemicalsOnly = prm.get_bool("Debug", "Chemicals only");
+	const bool testConvergence = prm.get_bool("Debug", "Convergence check");
 
 	// options here to run other simulations/tests:
 	if(gridOnly)
@@ -148,7 +156,17 @@ FullSimulator<dim>::run()
 	}
 	else if(chemicalsOnly)
 	{
+		setup_geometry_grid();
+		setup_velocity();
+		setup_chemicals();
 		run_chemicals_only();
+	}
+	else if(testConvergence)
+	{
+		setup_geometry_grid();
+		setup_velocity();
+		setup_chemicals();
+		run_convergence_check();
 	}
 	else
 	{
@@ -245,7 +263,85 @@ template<int dim>
 void
 FullSimulator<dim>::run_chemicals_only()
 {
-	std::cout << "still need to implement" << std::endl;
+	std::cout << std::endl << std::endl
+		<< "Starting chemicals debugging simulation" << std::endl
+		<< Utility::long_line << std::endl
+		<< Utility::long_line << std::endl << std::endl;
+
+	// save period:
+	const unsigned int modsave
+		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
+	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
+
+	// intialize chem field:
+	intialize_chemicals();
+
+	do{
+		// update time:
+		time += chemical_time_step;
+		++time_step_number;
+
+		// output:
+		if(time_step_number % modsave == 0)
+		{
+			std::cout << "saving at time: " << time << std::endl;
+			if(isSavingChemicals)
+				output_chemicals();
+			if(recordMass)
+				output_chemical_mass();
+
+			++save_step_number;
+		}
+
+		// add option of only controls...
+		chemicals.update(); 
+
+	}while( time < run_time );
+
+}
+
+template<int dim>
+void
+FullSimulator<dim>::intialize_chemicals()
+{
+	std::string section = "Debug.Gaussian";
+	const unsigned int one = 0;
+	const unsigned int two = 1;
+
+	Point<dim> center_one = prm.get_point_list(section, "Centers")[one];
+	Point<dim> center_two = prm.get_point_list(section, "Centers")[two];
+
+	double amp_one = prm.get_double_vector(section, "Amplitudes")[one];
+	double amp_two = prm.get_double_vector(section, "Amplitudes")[two];
+
+	double wid_one = prm.get_double_vector(section, "Widths")[one];
+	double wid_two = prm.get_double_vector(section, "Widths")[two];
+
+	TestFunctions::Gaussian<dim> gauss_one(center_one, amp_one, wid_one);
+	TestFunctions::Gaussian<dim> gauss_two(center_two, amp_two, wid_two);
+
+	chemicals.project_function(one, gauss_one);
+	chemicals.project_function(two, gauss_two);
+}
+
+/** \brief CONVERGENCE CHECKS WITH MESH REFINEMENT */
+/** Solutions are time dependent so we may want to querry accuracy at different 
+* time steps.
+*/
+template<int dim>
+void
+FullSimulator<dim>::run_convergence_check()
+{
+	ConvergenceTable convergence_table;
+
+	std::cout << std::endl << std::endl
+		<< "Running Convergence checks..." << std::endl
+		<< Utility::long_line << std::endl
+		<< Utility::long_line << std::endl << std::endl;
+
+
+
 }
 
 /** \brief Method to reintoduce new microbe groups into simulation */
@@ -394,24 +490,21 @@ FullSimulator<dim>::setup_geometry_grid()
 		GridGenerationTools::output_grid(output_directory,"before_stokes_grid",triangulation);
 }
 
-/** \brief Setup simulation system */
-/** Read in parameters, construct and intialize required objects,
-* and output simulation information to simulation directory 
-*/
+/** \brief Setup up velocity */
 template<int dim>
 void
-FullSimulator<dim>::setup_system()
+FullSimulator<dim>::setup_velocity()
 {
-	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
-
-	setup_geometry_grid();
-
-// setup velocity:
 	std::cout << "...setting up velocity" << std::endl;
 		velocity_function.init(prm,geometry,triangulation,output_directory);
 		GridGenerationTools::output_grid(output_directory,"after_stokes_grid",triangulation);
+}
 
-// setup chemicals:
+/** \brief Setup up chemicals and control functions */
+template<int dim>
+void
+FullSimulator<dim>::setup_chemicals()
+{
 	std::cout << "...setting up time steps" << std::endl;
 		setup_time_steps();
 		std::cout << "\t...using chemical time step: " << chemical_time_step << std::endl;
@@ -425,8 +518,13 @@ FullSimulator<dim>::setup_system()
 	std::cout << "...setting up control functions" << std::endl;
 		control_functions.setup(prm);
 		control_functions.printInfo(std::cout);
+}
 
-// setup bacteria:
+/** \brief Setup up bacteria */
+template<int dim>
+void
+FullSimulator<dim>::setup_bacteria()
+{
 	std::cout << "...setting up bacteria" << std::endl;
 		bacteria.init(prm, geometry);
 		bacteria.printInfo(std::cout);
@@ -434,6 +532,31 @@ FullSimulator<dim>::setup_system()
 	std::cout << "...setting up fitness" << std::endl;
 		setup_fitness();
 		fitness_function.printInfo(std::cout);
+}
+
+
+/** \brief Setup simulation system */
+/** Read in parameters, construct and intialize required objects,
+* and output simulation information to simulation directory 
+*/
+template<int dim>
+void
+FullSimulator<dim>::setup_system()
+{
+	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
+
+// setup geometry and grid:
+	setup_geometry_grid();
+
+// setup velocity:
+	setup_velocity();
+
+// setup chemicals:
+	setup_chemicals();
+
+// setup bacteria:
+	setup_bacteria();
+
 	std::cout << std::endl << std::endl;
 } // setup_system()
 
@@ -464,9 +587,9 @@ double
 FullSimulator<dim>::get_chemical_time_step()
 {
 	const double min_time_step = 0.001;
+
 	double maximal_velocity = velocity_function.get_maximum_velocity(0); 
 	maximal_velocity = std::max(maximal_velocity, 0.1);
-
 	double cfl_time_step = dealii::GridTools::minimal_cell_diameter(triangulation)
 							/ maximal_velocity;
 	std::cout << "\tCFL_TIME_STEP: " << cfl_time_step << std::endl;
@@ -518,6 +641,19 @@ FullSimulator<dim>::declare_parameters()
 		prm.declare_entry("Grid only","False",Patterns::Bool());
 		prm.declare_entry("Record chemical mass","False",Patterns::Bool());
 		prm.declare_entry("Track microbe chemicals","False",Patterns::Bool());
+		prm.declare_entry("Convergence check","False",Patterns::Bool());
+
+
+		prm.enter_subsection("Gaussian");
+			prm.declare_entry("Centers",
+								"{{}}",
+								Patterns::List(Patterns::List(Patterns::Double())));
+			prm.declare_entry("Amplitudes","{0,0}",
+								Patterns::List(Patterns::Double()));
+			prm.declare_entry("Widths","{0,0}",
+								Patterns::List(Patterns::Double()));
+		prm.leave_subsection();
+
 	prm.leave_subsection();
 
 	// declare class based parameters:
@@ -528,6 +664,65 @@ FullSimulator<dim>::declare_parameters()
 	Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
 	Bacteria::Fitness::declare_parameters(prm);
 }
+
+
+// METHODS TO CHECK CONVERGENCE:
+template <int dim>
+void 
+FullSimulator<dim>::process_solution(const unsigned int cycle)
+{
+	Vector<float> difference_per_cell(triangulation.n_active_cells());
+	VectorTools::integrate_difference(dof_handler,
+	                              solution,
+	                              Solution<dim>(),
+	                              difference_per_cell,
+	                              QGauss<dim>(fe->degree + 1),
+	                              VectorTools::L2_norm);
+	const double L2_error =
+		VectorTools::compute_global_error(triangulation,
+		                                difference_per_cell,
+		                                VectorTools::L2_norm);
+
+	VectorTools::integrate_difference(dof_handler,
+	                              solution,
+	                              Solution<dim>(),
+	                              difference_per_cell,
+	                              QGauss<dim>(fe->degree + 1),
+	                              VectorTools::H1_seminorm);
+	const double H1_error =
+		VectorTools::compute_global_error(triangulation,
+		                                difference_per_cell,
+		                                VectorTools::H1_seminorm);
+
+	const QTrapez<1>     q_trapez;
+	const QIterated<dim> q_iterated(q_trapez, fe->degree * 2 + 1);
+	VectorTools::integrate_difference(dof_handler,
+	                              solution,
+	                              Solution<dim>(),
+	                              difference_per_cell,
+	                              q_iterated,
+	                              VectorTools::Linfty_norm);
+	const double Linfty_error =
+		VectorTools::compute_global_error(triangulation,
+		                                difference_per_cell,
+		                                VectorTools::Linfty_norm);
+
+	const unsigned int n_active_cells = triangulation.n_active_cells();
+	const unsigned int n_dofs         = dof_handler.n_dofs();
+
+	std::cout << "Cycle " << cycle << ':' << std::endl
+	      << "   Number of active cells:       " << n_active_cells
+	      << std::endl
+	      << "   Number of degrees of freedom: " << n_dofs << std::endl;
+	convergence_table.add_value("cycle", cycle);
+	convergence_table.add_value("cells", n_active_cells);
+	convergence_table.add_value("dofs", n_dofs);
+	convergence_table.add_value("L2", L2_error);
+	convergence_table.add_value("H1", H1_error);
+	convergence_table.add_value("Linfty", Linfty_error);
+}
+
+
 
 } // close namespace
 #endif

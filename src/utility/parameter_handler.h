@@ -284,6 +284,10 @@ public:
 	std::vector<std::string> get_string_vector(const std::string& section, const std::string& entry) const;
 	std::vector<double> get_double_vector(const std::string& section, const std::string& entry) const;
 
+
+	std::string	get_current_path() const;
+	std::string	get_current_full_path(const std::string &name) const;
+
 	// OUTPUT:
 	void print(std::ostream& out) const;
 	void print_simple(std::ostream& out) const;
@@ -306,8 +310,6 @@ private:
 
 	std::vector<std::unique_ptr<const MultiParameterData> > looped_parameters;
 
-	std::string	get_current_path() const;
-	std::string	get_current_full_path(const std::string &name) const;
 
 	// looped tools:
 	void assign_looped_parameters();

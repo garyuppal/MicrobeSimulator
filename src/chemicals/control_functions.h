@@ -176,6 +176,7 @@ Controls<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Controls");
 		prm.declare_entry("Type","{None,None}",
 							Patterns::List(Patterns::Selection("None|Square pulse")));
+		
 		prm.enter_subsection("Square pulse"); // currently fixed for 2 chemicals?
 			prm.declare_entry("Height","{0,0}",Patterns::List(Patterns::Double()));
 			prm.declare_entry("On period","{0,0}",Patterns::List(Patterns::Double()));

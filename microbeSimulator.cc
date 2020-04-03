@@ -14,18 +14,30 @@
 // *************************************************************************************
 // todo:
 
+//*** parameter handler fails if no matching end in subsection for parameter files
+// maybe invoke a precheck that gives a clearer error
+
+// also should give error if file given doesn't exist!!	
+
+// look up: Sticky Matrix: Adhesion Mechanism of the
+// Staphylococcal Polysaccharide Intercellular
+// Adhesin
+
 // MASS SEEMS TO CHANGE AS WE CROSS DIFFERENT REFINEMENT AREAS
 // not sure if this is due to wrong integration or actual bug
 // *** check also by getting chemical values at location of microbe over time
 // also test without flow, but perhaps small flow for microbes only...
 
 // - add easy chemical debug ...
-// change debug option in cmdprm to just a fixed seed option
 
+
+// - add circle geometries for vortex and cylindrical pipe...
 // - add a DG implementation??? // refactor chemicals	
 
+
+
 // build tests to be sure of the following:
-// 1) figure out if sticking is an issue
+// 1) figure out if sticking is an issue (chemical mass conservation)
 // 2) groups streching, not splitting?  with pipe shear -- but seem ok in filter
 
 // also try simulation continuous version to check pattern types...
@@ -34,7 +46,7 @@
 
 // switch to new fitness class
 
-// - add circle geometries for vortex and cylindrical pipe...
+// *** error using middle refined and periodic bc
 
 
 // ...
@@ -46,6 +58,10 @@
 	// - get_point_list of parameter_handler.h, generalize...
 
 // - eventually generalize bacteria types....
+
+// if we want to incorporate command line parameters into the same class
+// as parameter handler, could implement a static declare parameter method
+// for simulator that we call in main before running simulation
 // *************************************************************************************
 
 int main(int argc, char** argv)
