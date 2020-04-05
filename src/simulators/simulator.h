@@ -1,12 +1,11 @@
-#ifndef MICROBESIMULATOR_FULL_SIMULATOR_H
-#define MICROBESIMULATOR_FULL_SIMULATOR_H
+#ifndef MICROBESIMULATOR_SIMULATOR_H
+#define MICROBESIMULATOR_SIMULATOR_H
 
 #include <deal.II/grid/tria.h>
 using dealii::Triangulation;
 
 #include "../bacteria/bacteria_handler.h" 
 #include "../bacteria/bacteria_fitness.h"
-#include "../chemicals/chemical_handler.h"
 #include "../advection/advection_handler.h"
 #include "../geometry/geometry.h"
 #include "../geometry/geometry_builder.h" 
@@ -15,44 +14,39 @@ using dealii::Triangulation;
 
 #include "./test_functions.h"
 
-// #include "../refactored_chemicals/chemical_handler.h"
-#include "../refactored_chemicals/fdm_chemical.h"
+// #include "../chemicals/chemical_handler.h"
+#include "../refactored_chemicals/chemical_handler.h"
 
 #include <array>
 #include <algorithm>
 #include <deal.II/base/function.h>
 
-/** @file
-* \brief Simulator file
-* Simulation class defined here
-* @todo add parameter handler pattern checking
-* @todo add list option to parameter looping
-*/
 
 /** \brief Main namespace for MicrobeSimulator */
-namespace MicrobeSimulator{
+namespace MicrobeSimulator{ 
 
-	namespace SimulationTools{
-		/** \brief Output vector to file */
-		void output_vector(const std::vector<double>& vec, 
-			const std::string& data_name,
-			const std::string& output_directory)
-		{
-			std::string outFile = output_directory + "/" + data_name + ".dat";
-			std::ofstream out(outFile);
+/** \brief Namespace for simulator */
+namespace Simulation{
 
-			for(unsigned int i = 0; i < vec.size(); ++i)	
-				out << vec[i] << std::endl;
-		}
-	} // close SimulationTools namespace
+/** \brief Output vector to file */
+void output_vector(const std::vector<double>& vec, 
+	const std::string& data_name,
+	const std::string& output_directory)
+{
+	std::string outFile = output_directory + "/" + data_name + ".dat";
+	std::ofstream out(outFile);
+
+	for(unsigned int i = 0; i < vec.size(); ++i)	
+		out << vec[i] << std::endl;
+}
 
 /** \brief Simulator class
 * This class handles reading in parameters, constructing, and executing the simulation.
 */
 template<int dim>
-class FullSimulator{
+class Simulator{
 public:
-	FullSimulator(const CommandLineParameters& cmd_prm);
+	Simulator(const CommandLineParameters& cmd_prm);
 
 	void run();
 private:
@@ -61,12 +55,17 @@ private:
 	Triangulation<dim>						triangulation;
 	Geometry<dim> 							geometry;
 	Velocity::AdvectionHandler<dim>			velocity_function;
-	Chemicals::ChemicalHandler<dim> 		chemicals;
 
-	Chemicals::Controls<dim>				control_functions;
+	// Chemicals::ChemicalHandler<dim> 		chemicals;
+	RefactoredChemicals::ChemicalHandler<dim> chemicals;
+
+	RefactoredChemicals::Controls<dim>			control_functions;
 
 	Bacteria::BacteriaHandler<dim>			bacteria;
-	Bacteria::OR_Fitness<dim>				fitness_function;
+
+	// Bacteria::OR_Fitness<dim>				fitness_function;
+		/** @todo type of fitness given by parameter as well */
+	Bacteria::TestNewFitness::Fitness_Function<dim>	 fitness_function;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;
@@ -109,8 +108,8 @@ private:
 	// Simulators:
 	void run_microbes();
 
-	void run_chemicals_only(); // for debugging purposes
-		void intialize_chemicals(); 
+	// void run_chemicals_only(); // for debugging purposes
+		// void intialize_chemicals(); 
 
 	void run_convergence_check();
 	// // DEBUGGING METHODS:
@@ -123,7 +122,7 @@ private:
 
 /** \brief Construct simulator */
 template<int dim>
-FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
+Simulator<dim>::Simulator(const CommandLineParameters& cmd_prm)
 	:
 	prm(cmd_prm.getParameterFile(), cmd_prm.getJobID()),
 	triangulation(Triangulation<dim>::maximum_smoothing),
@@ -142,46 +141,44 @@ FullSimulator<dim>::FullSimulator(const CommandLineParameters& cmd_prm)
 /** \brief Run simulation */
 template<int dim>
 void
-FullSimulator<dim>::run()
+Simulator<dim>::run()
 {
-	RefactoredChemicals::FDMChemical<2> testtestchemchem(prm,geometry,velocity_function,0,0);
-
 	setup_parameters();
 
-	const bool gridOnly = prm.get_bool("Debug", "Grid only");
-	const bool chemicalsOnly = prm.get_bool("Debug", "Chemicals only");
-	const bool testConvergence = prm.get_bool("Debug", "Convergence check");
+	// const bool gridOnly = prm.get_bool("Debug", "Grid only");
+	// const bool chemicalsOnly = prm.get_bool("Debug", "Chemicals only");
+	// const bool testConvergence = prm.get_bool("Debug", "Convergence check");
 
-	// options here to run other simulations/tests:
-	if(gridOnly)
-	{
-		setup_geometry_grid();
-	}
-	else if(chemicalsOnly)
-	{
-		setup_geometry_grid();
-		setup_velocity();
-		setup_chemicals();
-		run_chemicals_only();
-	}
-	else if(testConvergence)
-	{
-		setup_geometry_grid();
-		setup_velocity();
-		setup_chemicals();
-		run_convergence_check();
-	}
-	else
-	{
+	// // options here to run other simulations/tests:
+	// if(gridOnly)
+	// {
+	// 	setup_geometry_grid();
+	// }
+	// else if(chemicalsOnly)
+	// {
+	// 	setup_geometry_grid();
+	// 	setup_velocity();
+	// 	setup_chemicals();
+	// 	run_chemicals_only();
+	// }
+	// else if(testConvergence)
+	// {
+	// 	setup_geometry_grid();
+	// 	setup_velocity();
+	// 	setup_chemicals();
+	// 	run_convergence_check();
+	// }
+	// else
+	// {
 		setup_system();
 		run_microbes();
-	}
+	// }
 }
 
 /** \brief Run evolving microbe simulation */
 template<int dim>
 void
-FullSimulator<dim>::run_microbes()
+Simulator<dim>::run_microbes()
 {
 	std::cout << std::endl << std::endl
 		<< "Starting microbe simulation" << std::endl
@@ -258,75 +255,75 @@ FullSimulator<dim>::run_microbes()
 	}while( (time < run_time) && dont_kill );
 
 	if(reintro)
-		SimulationTools::output_vector(bacteria.get_pg_rates(),
+		output_vector(bacteria.get_pg_rates(),
 			"pg_rates",output_directory);
 } // run_microbes()
 
-template<int dim>
-void
-FullSimulator<dim>::run_chemicals_only()
-{
-	std::cout << std::endl << std::endl
-		<< "Starting chemicals debugging simulation" << std::endl
-		<< Utility::long_line << std::endl
-		<< Utility::long_line << std::endl << std::endl;
+// template<int dim>
+// void
+// Simulator<dim>::run_chemicals_only()
+// {
+// 	std::cout << std::endl << std::endl
+// 		<< "Starting chemicals debugging simulation" << std::endl
+// 		<< Utility::long_line << std::endl
+// 		<< Utility::long_line << std::endl << std::endl;
 
-	// save period:
-	const unsigned int modsave
-		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
-	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
-	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
+// 	// save period:
+// 	const unsigned int modsave
+// 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
+// 	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+// 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
 
-	// intialize chem field:
-	intialize_chemicals();
+// 	// intialize chem field:
+// 	intialize_chemicals();
 
-	do{
-		// update time:
-		time += chemical_time_step;
-		++time_step_number;
+// 	do{
+// 		// update time:
+// 		time += chemical_time_step;
+// 		++time_step_number;
 
-		// output:
-		if(time_step_number % modsave == 0)
-		{
-			std::cout << "saving at time: " << time << std::endl;
-			if(isSavingChemicals)
-				output_chemicals();
-			if(recordMass)
-				output_chemical_mass();
+// 		// output:
+// 		if(time_step_number % modsave == 0)
+// 		{
+// 			std::cout << "saving at time: " << time << std::endl;
+// 			if(isSavingChemicals)
+// 				output_chemicals();
+// 			if(recordMass)
+// 				output_chemical_mass();
 
-			++save_step_number;
-		}
+// 			++save_step_number;
+// 		}
 
-		// add option of only controls...
-		chemicals.update(); 
+// 		// add option of only controls...
+// 		chemicals.update(); 
 
-	}while( time < run_time );
+// 	}while( time < run_time );
 
-}
+// }
 
-template<int dim>
-void
-FullSimulator<dim>::intialize_chemicals()
-{
-	std::string section = "Debug.Gaussian";
-	const unsigned int one = 0;
-	const unsigned int two = 1;
+// template<int dim>
+// void
+// Simulator<dim>::intialize_chemicals()
+// {
+// 	std::string section = "Debug.Gaussian";
+// 	const unsigned int one = 0;
+// 	const unsigned int two = 1;
 
-	Point<dim> center_one = prm.get_point_list(section, "Centers")[one];
-	Point<dim> center_two = prm.get_point_list(section, "Centers")[two];
+// 	Point<dim> center_one = prm.get_point_list(section, "Centers")[one];
+// 	Point<dim> center_two = prm.get_point_list(section, "Centers")[two];
 
-	double amp_one = prm.get_double_vector(section, "Amplitudes")[one];
-	double amp_two = prm.get_double_vector(section, "Amplitudes")[two];
+// 	double amp_one = prm.get_double_vector(section, "Amplitudes")[one];
+// 	double amp_two = prm.get_double_vector(section, "Amplitudes")[two];
 
-	double wid_one = prm.get_double_vector(section, "Widths")[one];
-	double wid_two = prm.get_double_vector(section, "Widths")[two];
+// 	double wid_one = prm.get_double_vector(section, "Widths")[one];
+// 	double wid_two = prm.get_double_vector(section, "Widths")[two];
 
-	TestFunctions::Gaussian<dim> gauss_one(center_one, amp_one, wid_one);
-	TestFunctions::Gaussian<dim> gauss_two(center_two, amp_two, wid_two);
+// 	TestFunctions::Gaussian<dim> gauss_one(center_one, amp_one, wid_one);
+// 	TestFunctions::Gaussian<dim> gauss_two(center_two, amp_two, wid_two);
 
-	chemicals.project_function(one, gauss_one);
-	chemicals.project_function(two, gauss_two);
-}
+// 	chemicals.project_function(one, gauss_one);
+// 	chemicals.project_function(two, gauss_two);
+// }
 
 /** \brief CONVERGENCE CHECKS WITH MESH REFINEMENT */
 /** Solutions are time dependent so we may want to querry accuracy at different 
@@ -334,7 +331,7 @@ FullSimulator<dim>::intialize_chemicals()
 */
 template<int dim>
 void
-FullSimulator<dim>::run_convergence_check()
+Simulator<dim>::run_convergence_check()
 {
 	// ConvergenceTable convergence_table;
 
@@ -350,7 +347,7 @@ FullSimulator<dim>::run_convergence_check()
 /** \brief Method to reintoduce new microbe groups into simulation */
 template<int dim>
 void
-FullSimulator<dim>::reintro_bacteria()
+Simulator<dim>::reintro_bacteria()
 {
 	const unsigned int intro_number = 
 		std::floor(time/(prm.get_double("Bacteria","Reintroduction period")));
@@ -370,7 +367,7 @@ FullSimulator<dim>::reintro_bacteria()
 /** Do random walk, reproduce, and mutate */
 template<int dim>
 void
-FullSimulator<dim>::update_bacteria()
+Simulator<dim>::update_bacteria()
 {
 	bacteria.move(bacteria_time_step, geometry, velocity_function);
 	bacteria.reproduce(bacteria_time_step, fitness_function);
@@ -383,7 +380,7 @@ FullSimulator<dim>::update_bacteria()
 /** \brief Output bacteria to file in simulation output directory */
 template<int dim>
 void
-FullSimulator<dim>::output_bacteria() const
+Simulator<dim>::output_bacteria() const
 {
 	std::string outfile = output_directory
 						+ "/bacteria_"
@@ -396,7 +393,7 @@ FullSimulator<dim>::output_bacteria() const
 /** \brief Output chemical fields to file in simulation output directory */
 template<int dim>
 void
-FullSimulator<dim>::output_chemicals() const
+Simulator<dim>::output_chemicals() const
 {
 	std::string save_type = prm.get_string("Chemicals","Save type");
 
@@ -419,7 +416,7 @@ FullSimulator<dim>::output_chemicals() const
 * (primarily for debugging) */
 template<int dim>
 void
-FullSimulator<dim>::output_chemical_mass() const
+Simulator<dim>::output_chemical_mass() const
 {
 	std::string outfile = output_directory
 					+ "/chemical_masses_"
@@ -435,7 +432,7 @@ FullSimulator<dim>::output_chemical_mass() const
 * (primarily for debugging) */
 template<int dim>
 void
-FullSimulator<dim>::output_local_chemicals() const
+Simulator<dim>::output_local_chemicals() const
 {
 	const unsigned int nc = chemicals.getNumberChemicals();
 
@@ -463,7 +460,7 @@ FullSimulator<dim>::output_local_chemicals() const
 /** \brief Setup system parameters and read in from file */
 template<int dim>
 void
-FullSimulator<dim>::setup_parameters()
+Simulator<dim>::setup_parameters()
 {
 	std::cout << "...setting up parameters" << std::endl;
 
@@ -479,7 +476,7 @@ FullSimulator<dim>::setup_parameters()
 /** \brief setup and output geometry and mesh grid */
 template<int dim>
 void
-FullSimulator<dim>::setup_geometry_grid()
+Simulator<dim>::setup_geometry_grid()
 {
 	std::cout << "...setting up geometry" << std::endl;
 		GeometryTools::GeometryBuilder<dim> geo_bldr(prm);
@@ -496,7 +493,7 @@ FullSimulator<dim>::setup_geometry_grid()
 /** \brief Setup up velocity */
 template<int dim>
 void
-FullSimulator<dim>::setup_velocity()
+Simulator<dim>::setup_velocity()
 {
 	std::cout << "...setting up velocity" << std::endl;
 		velocity_function.init(prm,geometry,triangulation,output_directory);
@@ -506,7 +503,7 @@ FullSimulator<dim>::setup_velocity()
 /** \brief Setup up chemicals and control functions */
 template<int dim>
 void
-FullSimulator<dim>::setup_chemicals()
+Simulator<dim>::setup_chemicals()
 {
 	std::cout << "...setting up time steps" << std::endl;
 		setup_time_steps();
@@ -526,7 +523,7 @@ FullSimulator<dim>::setup_chemicals()
 /** \brief Setup up bacteria */
 template<int dim>
 void
-FullSimulator<dim>::setup_bacteria()
+Simulator<dim>::setup_bacteria()
 {
 	std::cout << "...setting up bacteria" << std::endl;
 		bacteria.init(prm, geometry);
@@ -544,7 +541,7 @@ FullSimulator<dim>::setup_bacteria()
 */
 template<int dim>
 void
-FullSimulator<dim>::setup_system()
+Simulator<dim>::setup_system()
 {
 	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
 
@@ -566,7 +563,7 @@ FullSimulator<dim>::setup_system()
 /** \brief Store local parameters read in from file */
 template<int dim>
 void
-FullSimulator<dim>::assign_local_parameters()
+Simulator<dim>::assign_local_parameters()
 {
 	run_time = prm.get_double("Run time");
 	save_period = prm.get_double("Save period");
@@ -575,7 +572,7 @@ FullSimulator<dim>::assign_local_parameters()
 /** \brief Setup suitable time steps for bacteria and chemicals */
 template<int dim>
 void
-FullSimulator<dim>::setup_time_steps()
+Simulator<dim>::setup_time_steps()
 {
 	chemical_time_step = get_chemical_time_step();
 	const double bacteria_max_time_step = 0.01;
@@ -587,7 +584,7 @@ FullSimulator<dim>::setup_time_steps()
 /** \brief Get stable chemical time step from CFL condition */
 template<int dim>
 double
-FullSimulator<dim>::get_chemical_time_step()
+Simulator<dim>::get_chemical_time_step()
 {
 	const double min_time_step = 0.001;
 
@@ -607,19 +604,9 @@ FullSimulator<dim>::get_chemical_time_step()
 /** @todo Move this to a fitness_handler class ... */
 template<int dim>
 void
-FullSimulator<dim>::setup_fitness()
+Simulator<dim>::setup_fitness()
 {
-	const std::string section = "Fitness";
-	fitness_function.attach_chemicals(chemicals);
-
-	// this needs to be a base function if using polymorphism: (can also use constructor)
-	double sc = prm.get_double(section, "Secretion cost");
-	std::cout << "secretion cost obtained: " << sc << std::endl;
-
-	fitness_function.setup_fitness_constants(
-			prm.get_double_vector(section, "Chemical fitness"),
-			prm.get_double(section, "Secretion cost"),
-			prm.get_double_vector(section, "Chemical saturation"));
+	fitness_function.init(prm, chemicals);
 }
 
 /** \brief Declare local parameters needed for simulator 
@@ -627,7 +614,7 @@ FullSimulator<dim>::setup_fitness()
 */
 template<int dim>
 void 
-FullSimulator<dim>::declare_parameters()
+Simulator<dim>::declare_parameters()
 {
 	prm.declare_entry("Simulator type",
 						"Bacteria",
@@ -672,7 +659,7 @@ FullSimulator<dim>::declare_parameters()
 // METHODS TO CHECK CONVERGENCE:
 // template <int dim>
 // void 
-// FullSimulator<dim>::process_solution(const unsigned int cycle)
+// Simulator<dim>::process_solution(const unsigned int cycle)
 // {
 // 	Vector<float> difference_per_cell(triangulation.n_active_cells());
 // 	VectorTools::integrate_difference(dof_handler,
@@ -727,5 +714,5 @@ FullSimulator<dim>::declare_parameters()
 
 
 
-} // close namespace
+}} // CLOSE NAMESPACES
 #endif

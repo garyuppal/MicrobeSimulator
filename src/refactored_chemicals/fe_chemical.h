@@ -1,5 +1,5 @@
-#ifndef MICROBE_SIMULATOR_FE_CHEMICAL_H
-#define MICROBE_SIMULATOR_FE_CHEMICAL_H
+#ifndef MICROBE_SIMULATOR_REFACTORED_FE_CHEMICAL_H
+#define MICROBE_SIMULATOR_REFACTORED_FE_CHEMICAL_H
 
 #include <deal.II/base/timer.h>
 
@@ -11,7 +11,15 @@
 #include "./control_functions.h"
 #include "../utility/fe_tools.h"
 
-namespace MicrobeSimulator{ namespace Chemicals{
+
+// check new chem interface, there shouldn't be any access methods not part of interface
+// initialization should be through constrcutor only
+
+// eventually see what base needs, and how to include DG element 
+
+// add a testing / convergence method in handler class
+
+namespace MicrobeSimulator{ namespace RefactoredChemicals{
 	using namespace dealii;
 
 template<int dim>

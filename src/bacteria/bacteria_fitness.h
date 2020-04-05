@@ -5,6 +5,7 @@
 using dealii::Point;
 
 #include "../chemicals/chemical_handler.h"
+#include "../refactored_chemicals/chemical_handler.h"
 #include "../utility/utility.h"
 
 #include <vector>
@@ -26,6 +27,8 @@ namespace Fitness{
 		prm.leave_subsection();
 	}
 } // fitness namespace
+
+
 // ----------------------------------------------------------------------
 // FITNESS BASE: (Interface)
 // ----------------------------------------------------------------------
@@ -205,7 +208,7 @@ namespace TestNewFitness{
 template<int dim>
 class FitnessBase{
 public:
-	FitnessBase(const Chemicals::ChemicalHandler<dim>& ch);
+	FitnessBase(const RefactoredChemicals::ChemicalHandler<dim>& ch);
 	virtual ~FitnessBase() {}
 
 	virtual double value(const Point<dim>& location,
@@ -214,7 +217,7 @@ public:
 	virtual void printInfo(std::ostream& out) const=0;
 
 protected:
-	Chemicals::ChemicalHandler<dim> const * chemicals; 
+	RefactoredChemicals::ChemicalHandler<dim> const * chemicals; 
 };
 
 // IMPL
@@ -222,7 +225,7 @@ protected:
 
 /** \brief Fitness base constructor */
 template<int dim>
-FitnessBase<dim>::FitnessBase(const Chemicals::ChemicalHandler<dim>& ch)
+FitnessBase<dim>::FitnessBase(const RefactoredChemicals::ChemicalHandler<dim>& ch)
 	:
 	chemicals(&ch)
 {}
@@ -237,7 +240,7 @@ FitnessBase<dim>::FitnessBase(const Chemicals::ChemicalHandler<dim>& ch)
 template<int dim>
 class OR_Fitness : public FitnessBase<dim>{
 public:
-	OR_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+	OR_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
 			const ParameterHandler& prm);
 
 	static void declare_parameters(ParameterHandler& prm);
@@ -261,10 +264,10 @@ private:
 
 /** \brief OR type fitness constructor */
 template<int dim>
-OR_Fitness<dim>::OR_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+OR_Fitness<dim>::OR_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
 		const ParameterHandler& prm)
 	:
-	FitnessBase<dim>(&ch)
+	FitnessBase<dim>(ch)
 {
 	std::string subsection = "Fitness.OR";
 
@@ -297,7 +300,23 @@ double
 OR_Fitness<dim>::value(const Point<dim>& location,
 		const std::vector<double>& rates) const
 {
-	return 0;
+	const unsigned int numchem = this->chemicals->getNumberChemicals();
+
+	assert(rates.size() == numchem);
+
+	double total_goods = 0;
+	double total_secretion_rate = 0;
+
+	for(unsigned int i = 0; i < numchem-1; ++i)
+	{
+		total_goods += (*this->chemicals)[i].value(location);
+		total_secretion_rate += rates[i];
+	}
+	const double waste = (*this->chemicals)[numchem-1].value(location);
+
+	return benefit*total_goods / ( total_goods + benefit_saturation )
+		- harm*waste / ( waste + harm_saturation )
+		- secretion_cost * total_secretion_rate; 
 }
 
 /** \brief Display OR type fitness info */
@@ -327,7 +346,7 @@ OR_Fitness<dim>::printInfo(std::ostream& out) const
 template<int dim>
 class AND_Fitness : public FitnessBase<dim>{
 public:
-	AND_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+	AND_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
 			const ParameterHandler& prm);
 	
 	static void declare_parameters(ParameterHandler& prm);
@@ -351,10 +370,10 @@ private:
 
 /** \brief OR type fitness constructor */
 template<int dim>
-AND_Fitness<dim>::AND_Fitness(const Chemicals::ChemicalHandler<dim>& ch, 
+AND_Fitness<dim>::AND_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
 		const ParameterHandler& prm)
 	:
-	FitnessBase<dim>(&ch)
+	FitnessBase<dim>(ch)
 {
 	std::string subsection = "Fitness.OR";
 
@@ -386,7 +405,23 @@ double
 AND_Fitness<dim>::value(const Point<dim>& location,
 		const std::vector<double>& rates) const
 {
-	return 0;
+	const unsigned int numchem = this->chemicals->getNumberChemicals();
+
+	assert(rates.size() == numchem);
+
+	double total_goods = 1;
+	double total_secretion_rate = 0;
+
+	for(unsigned int i = 0; i < numchem-1; ++i)
+	{
+		total_goods *= (*this->chemicals)[i].value(location); // product of all goods
+		total_secretion_rate += rates[i];
+	}
+	const double waste = (*this->chemicals)[numchem-1].value(location);
+
+	return benefit*total_goods / ( total_goods + benefit_saturation )
+		- harm*waste / ( waste + harm_saturation )
+		- secretion_cost * total_secretion_rate; 
 }
 
 /** \brief Display AND type fitness info */
@@ -419,8 +454,8 @@ class Fitness_Function{
 public:
 	Fitness_Function();
 
-	void init(const Chemicals::ChemicalHandler<dim>& ch, 
-			const ParameterHandler& prm);
+	void init(const ParameterHandler& prm,
+		const RefactoredChemicals::ChemicalHandler<dim>& ch);
 
 	static void declare_parameters(ParameterHandler& prm);
 
@@ -443,8 +478,8 @@ Fitness_Function<dim>::Fitness_Function()
 
 template<int dim>
 void
-Fitness_Function<dim>::init(const Chemicals::ChemicalHandler<dim>& ch, 
-	const ParameterHandler& prm)
+Fitness_Function<dim>::init(const ParameterHandler& prm,
+		const RefactoredChemicals::ChemicalHandler<dim>& ch)
 {
 	const std::string section = "Fitness";
 	std::string fitness_type = prm.get_string(section, "Fitness type");
@@ -476,7 +511,7 @@ double
 Fitness_Function<dim>::value(const Point<dim>& location,
 				const std::vector<double>& rates) const
 {
-	fitness->value(location, rates);
+	return fitness->value(location, rates);
 }
 
 /** \brief Display fitness function info */
