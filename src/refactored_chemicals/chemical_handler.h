@@ -9,7 +9,6 @@
 // #include "../utility/cell_iterator_map.h" // switch to field class ... or actual map
 
 // #include "./chemical_fe_base.h"
-// #include "./fe_chemical.h"
 
 // #include "./control_functions.h"
 // #include "../utility/fe_tools.h"
@@ -22,9 +21,14 @@
 // chemical implementations:
 // #include "./field_base.h"
 #include "./fdm_chemical.h"
+#include "./fe_chemical.h"
 
 // finite elements:
 // #include "./chemical_fe_base.h" // cg_support and dg_support classes
+
+// TODO, parameter setup and initialization (from simulator)
+// store impl type to change saving method...
+// initializing time steps and calculating stability....
 
 namespace MicrobeSimulator{ namespace RefactoredChemicals{
 
@@ -77,8 +81,11 @@ public:
 private:
 	// shared pointer to base 
 	// std::shared_ptr<Chemical_FE_Base<dim> >					fe_base; // only create if needed
-	// bool baseInit;
+	bool baseInit; // may be good idea to store what chemicals were intialized and what type, 
+		// may or may not need separate dg_base (though we'll probably never use this)
+	// but then, instead of baseinit, just check if cg or dg type chem has already been declared
 
+	std::shared_ptr<Chemical_FE_Base<dim> >					cg_base; // needs triangulation to initialize
 	std::vector<std::shared_ptr<ChemicalInterface<dim> > > 	chemicals; 
 };
 
@@ -87,8 +94,8 @@ private:
 /** \brief Constructor for chemical handler */
 template<int dim>
 ChemicalHandler<dim>::ChemicalHandler()
-	// :
-	// baseInit(false)
+	:
+	baseInit(false)
 {}
 
 /** \brief Declare parameters needed for chemicals */
@@ -98,9 +105,9 @@ ChemicalHandler<dim>::declare_parameters(ParameterHandler& prm)
 {
 	prm.enter_subsection("Chemicals");
 		prm.declare_entry("Number chemicals","2",Patterns::Unsigned());
-		prm.declare_entry("Implementation","{}",
+		prm.declare_entry("Implementation","{FE, FE}",
 						Patterns::List(Patterns::Selection("FE|DG|FDM")),
-						"Implementation for chemicals. ...");
+						"Implementation method for chemicals.");
 		prm.declare_entry("Diffusion",
 							"{5,15}",
 							Patterns::List(Patterns::Double()));
@@ -112,8 +119,8 @@ ChemicalHandler<dim>::declare_parameters(ParameterHandler& prm)
 		prm.declare_entry("Time step factor", "1", Patterns::Double());
 		prm.declare_entry("Viscosity beta","1",Patterns::Double());
 
-		prm.declare_entry("FDM discretization","{{0.2,0.2},{0.2,0.2}}",
-						Patterns::List(Patterns::List(Patterns::Double())) ); // figure out later
+		prm.declare_entry("FDM discretization","{0.2, 0.2}",
+						Patterns::List(Patterns::Double()) ); // figure out later
 		// prm cell size (*** can put all needed parameters in arrays)
 		// may be confusing if using mixed types ... but shouldn't really be doing that anyway..
 	prm.leave_subsection();
@@ -140,14 +147,15 @@ ChemicalHandler<dim>::init(const ParameterHandler& prm,
 		}
 		else if( boost::iequals(impl_types[i], "FE") )
 		{
-			// // make sure to only initialize once
-			// if(!baseInit)
-			// {
-			// 	fe_base = std::make_shared<CG_Support<dim> >(prm, tria, velocity_function);
-			// 	baseInit = true; 
-			// }
-			// chemicals.emplace_back(
-			// 	std::make_shared<FE_Chemical<dim> >(prm, geo, fe_base, velocity_function, time_step, i) );
+			// make sure to only initialize once
+			if(!baseInit)
+			{
+				cg_base = std::make_shared<Chemical_FE_Base<dim> >(tria); // need to include velocity function? // could also init i suppose
+				cg_base->setup(velocity_function, geo.getBoundaryConditions()); // move to constructor ...
+				baseInit = true; 
+			}
+			chemicals.emplace_back(
+				std::make_shared<FE_Chemical<dim> >(prm, time_step, i, cg_base) );
 		}
 		else if( boost::iequals(impl_types[i], "DG") )
 		{
@@ -234,6 +242,7 @@ ChemicalHandler<dim>::output(std::string output_directory,
 							+ "_" 
 							+ dealii::Utilities::int_to_string(save_step_number,4)
 							+ ".vtk"; // might want to change format dynamically ...
+								// can set based on impl given by prm...
 		std::ofstream out(outfile);
 
 		chemicals[i]->print(out); 

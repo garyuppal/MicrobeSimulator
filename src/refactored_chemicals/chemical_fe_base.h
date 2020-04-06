@@ -68,6 +68,12 @@ namespace MicrobeSimulator{ namespace RefactoredChemicals{
 template<int dim>
 class Chemical_FE_Base{  
 public:
+	// Chemical_FE_Base() 	: triangulation(NULL),
+	// chemical_fe_degree(0),
+	// chemical_fe( 0 ),
+	// chemical_dof_handler(*triangulation),
+	// using_velocity(false) {} // remove, to check for now
+
 	Chemical_FE_Base(const Triangulation<dim>& tria,
 					const unsigned int degree = 1); // done
 

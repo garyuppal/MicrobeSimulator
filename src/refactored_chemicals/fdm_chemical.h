@@ -111,13 +111,11 @@ FDMChemical<dim>::FDMChemical(const ParameterHandler& prm,
 
 	// get discretization:
 	std::array<unsigned int, dim> disc;
-	/** @todo this only works for 2 dim, need to generalize parameter handler or
-	* declare parameters in a different manner */
-	std::vector<Point<2> > res = prm.get_point_list("Chemicals", "FDM discretization"); // gives resolution
+	std::vector<double> res = prm.get_double_vector("Chemicals", "FDM discretization"); // gives resolution
 
 	for(unsigned int i = 0; i < dim; ++i)
 	{
-		double dx = res[id][i];
+		double dx = res[id]; // same for all dimensions but can vary between chemicals
 		disc[i] = std::ceil( (upper[i]-lower[i])/dx );
 	}
 

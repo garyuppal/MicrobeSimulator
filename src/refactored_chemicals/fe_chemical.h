@@ -11,6 +11,7 @@
 #include "./control_functions.h"
 #include "../utility/fe_tools.h"
 
+#include "../utility/parameter_handler.h"
 
 // check new chem interface, there shouldn't be any access methods not part of interface
 // initialization should be through constrcutor only
@@ -25,14 +26,16 @@ namespace MicrobeSimulator{ namespace RefactoredChemicals{
 template<int dim>
 class FE_Chemical : public ChemicalInterface<dim>{
 public:	
-	FE_Chemical(); // done ...
+	FE_Chemical(const ParameterHandler& prm, double dt, unsigned int id,
+		const std::shared_ptr<Chemical_FE_Base<dim> >& chem_base);
+	// FE_Chemical(); // done ...
 
-	FE_Chemical(std::shared_ptr<Chemical_FE_Base<dim> > chem_base, //const Chemical_FE_Base<dim>& chem_base, 
-		double diffusion, double decay, double b, double dt);
+	// FE_Chemical(std::shared_ptr<Chemical_FE_Base<dim> > chem_base, //const Chemical_FE_Base<dim>& chem_base, 
+	// 	double diffusion, double decay, double b, double dt);
 	
 	// setup:
-	void reinit(const Chemical_FE_Base<dim>& chem_base,
-		double diffusion, double decay, double b, double dt); // done
+	// void reinit(const Chemical_FE_Base<dim>& chem_base,
+	// 	double diffusion, double decay, double b, double dt); // done
 
 	// interface & update:
 	double value(const Point<dim>& p) const override;
@@ -52,28 +55,30 @@ public:
 							const Function<dim>& control_function) override;
 
 	// accessors:
-	double 	getDiffusionConstant() const; // done
-	double 	getDecayConstant() const; // done
-	double 	getViscosityBeta() const; // done
-	double 	getTimeStep() const override;  // done
+	// double 	getDiffusionConstant() const; // done(inherited)
+	// double 	getDecayConstant() const; // done (inherited)
+
+	// double 	getViscosityBeta() const; // done ??? do we need?, not in interface
+	// double 	getTimeStep() const override;  // done (inherited)
 
 	// methods:
-	void 	project_initial_condition(const Function<dim>& initial_condition); // done
+	// void 	project_initial_condition(const Function<dim>& initial_condition); // done
 
-	double 	getMass() const; // done 
-	double 	getMin() const; // done // for debugging -- using min/max of vector for now...
-	double 	getMax() const; // done // for debugging -- using min/max of vector for now...
+	double 	getMass() const override; // done 
 
-	void 	output_solution(const std::string& output_directory,
-						 const unsigned int chem_id,
-						 const unsigned int save_step) const; // done
+	// double 	getMin() const; // done // for debugging -- using min/max of vector for now...
+	// double 	getMax() const; // done // for debugging -- using min/max of vector for now...
 
-	void 	output_solution(const std::string& output_directory,
-						 const unsigned int chem_id,
-						 const unsigned int save_step,
-						 const unsigned int cycle) const; 
+	// void 	output_solution(const std::string& output_directory,
+	// 					 const unsigned int chem_id,
+	// 					 const unsigned int save_step) const; // done
 
-	void 	print(std::ostream& out, unsigned int chem_id) const override;
+	// void 	output_solution(const std::string& output_directory,
+	// 					 const unsigned int chem_id,
+	// 					 const unsigned int save_step,
+	// 					 const unsigned int cycle) const; 
+
+	void 	print(std::ostream& out) const override;
 	void 	printInfo(std::ostream& out) const override;
 
 private:
@@ -121,25 +126,37 @@ private:
 /** IMPLEMENTATION
 */
 //-----------------------------------------------------------------------------
-template<int dim>
-FE_Chemical<dim>::FE_Chemical()
-	:
-	chemical_base(NULL)
-	// use_bdf2_scheme(false)
-	// viscosity_beta( 0. /* 0.017*dim */ ) // need to run tests to figure 
-{}
+// template<int dim>
+// FE_Chemical<dim>::FE_Chemical()
+// 	:
+// 	chemical_base(NULL)
+// 	// use_bdf2_scheme(false)
+// 	// viscosity_beta( 0. /* 0.017*dim */ ) // need to run tests to figure 
+// {}
 
-template<int dim> //const Chemical_FE_Base<dim>&
-FE_Chemical<dim>::FE_Chemical(std::shared_ptr<Chemical_FE_Base<dim> >	 chem_base, 
-	double diffusion, double decay, double b, double dt)
+// template<int dim> //const Chemical_FE_Base<dim>&
+// FE_Chemical<dim>::FE_Chemical(std::shared_ptr<Chemical_FE_Base<dim> >	 chem_base, 
+// 	double diffusion, double decay, double b, double dt)
+// 	:
+// 	chemical_base(chem_base),
+// 	diffusion_constant(diffusion),
+// 	decay_constant(decay),
+// 	viscosity_beta(b),
+// 	time_step(dt)
+// {
+// 	reinit();
+// }
+
+template<int dim>
+FE_Chemical<dim>::FE_Chemical(const ParameterHandler& prm, double dt, unsigned int id,
+	const std::shared_ptr<Chemical_FE_Base<dim> >& chem_base)
 	:
-	chemical_base(chem_base),
-	diffusion_constant(diffusion),
-	decay_constant(decay),
-	viscosity_beta(b),
-	time_step(dt)
+	ChemicalInterface<dim>(prm, dt, id), // takes care of diffusion, decay
+	chemical_base(chem_base) // not sure if this is right
 {
-	reinit();
+	viscosity_beta = prm.get_double("Chemicals", "Viscosity beta");
+
+	reinit(); // ???
 }
 
 // INTERFACE:
@@ -181,8 +198,12 @@ template<int dim>
 void 
 FE_Chemical<dim>::project_function(const Function<dim>& initial_condition)
 {
-	project_initial_condition(initial_condition);	
-}
+	VectorTools::project(chemical_base->get_dof_handler(),
+						chemical_base->get_constraints(),
+						QGauss<dim>(chemical_base->get_fe_degree() + 2 ),
+						initial_condition,
+						old_solution);
+	solution = old_solution;}
 
 
 
@@ -220,53 +241,53 @@ FE_Chemical<dim>::update(const std::vector<Point<dim> >& locations,
 }
 
 
-// ACCESSORS:
+// ACCESSORS: (inherited or not in interface... remove)
 // --------------------------------------------------------------------------------
-template<int dim>
-double 
-FE_Chemical<dim>::getDiffusionConstant() const
-{
-	return diffusion_constant;
-}
+// template<int dim>
+// double 
+// FE_Chemical<dim>::getDiffusionConstant() const
+// {
+// 	return diffusion_constant;
+// }
 
 
-template<int dim>
-double 
-FE_Chemical<dim>::getDecayConstant() const
-{
-	return decay_constant;
-}
+// template<int dim>
+// double 
+// FE_Chemical<dim>::getDecayConstant() const
+// {
+// 	return decay_constant;
+// }
 
-template<int dim>
-double 
-FE_Chemical<dim>::getViscosityBeta() const
-{
-	return viscosity_beta;
-}
+// template<int dim>
+// double 
+// FE_Chemical<dim>::getViscosityBeta() const
+// {
+// 	return viscosity_beta;
+// }
 
-template<int dim>
-double 	
-FE_Chemical<dim>::getTimeStep() const
-{
-	return time_step;
-}
+// template<int dim>
+// double 	
+// FE_Chemical<dim>::getTimeStep() const
+// {
+// 	return time_step;
+// }
 
 
 // INTIALIZATION:
 // --------------------------------------------------------------------------------------
-template<int dim>
-void 
-FE_Chemical<dim>::reinit(const Chemical_FE_Base<dim>& chem_base, 
-	double diffusion, double decay, double b, double dt)
-{
-	chemical_base = &chem_base;
-	diffusion_constant = diffusion;
-	decay_constant = decay;
-	viscosity_beta = b;
-	time_step = dt;
+// template<int dim>
+// void 
+// FE_Chemical<dim>::reinit(const Chemical_FE_Base<dim>& chem_base, 
+// 	double diffusion, double decay, double b, double dt)
+// {
+// 	chemical_base = &chem_base;
+// 	diffusion_constant = diffusion;
+// 	decay_constant = decay;
+// 	viscosity_beta = b;
+// 	time_step = dt;
 
-	reinit();
-}
+// 	reinit();
+// }
 
 
 template<int dim>
@@ -287,17 +308,17 @@ FE_Chemical<dim>::reinit()
 }
 
 
-template<int dim>
-void 
-FE_Chemical<dim>::project_initial_condition(const Function<dim>& initial_condition)
-{
-	VectorTools::project(chemical_base->get_dof_handler(),
-						chemical_base->get_constraints(),
-						QGauss<dim>(chemical_base->get_fe_degree() + 2 ),
-						initial_condition,
-						old_solution);
-	solution = old_solution;
-}
+// template<int dim>
+// void 
+// FE_Chemical<dim>::project_initial_condition(const Function<dim>& initial_condition)
+// {
+// 	VectorTools::project(chemical_base->get_dof_handler(),
+// 						chemical_base->get_constraints(),
+// 						QGauss<dim>(chemical_base->get_fe_degree() + 2 ),
+// 						initial_condition,
+// 						old_solution);
+// 	solution = old_solution;
+// }
 
 
 // UPDATE AND SOLVE:
@@ -556,92 +577,92 @@ FE_Chemical<dim>::getMass() const
 }
 
 
-template<int dim>
-double 
-FE_Chemical<dim>::getMin() const
-{
-	double min_value = solution[0];
+// template<int dim>
+// double 
+// FE_Chemical<dim>::getMin() const
+// {
+// 	double min_value = solution[0];
 
-	for(unsigned int i = 0; i < solution.size(); ++i)
-		min_value = std::min(min_value, solution[i]);
+// 	for(unsigned int i = 0; i < solution.size(); ++i)
+// 		min_value = std::min(min_value, solution[i]);
 
-	return min_value;
-}
-
-
-template<int dim>
-double 
-FE_Chemical<dim>::getMax() const
-{
-	double max_value = solution[0];
-
-	for(unsigned int i = 0; i < solution.size(); ++i)
-		max_value = std::max(max_value, solution[i]);
-
-	return max_value;
-}
+// 	return min_value;
+// }
 
 
-template<int dim>
-void 
-FE_Chemical<dim>::output_solution(const std::string& output_directory,
-						 const unsigned int chem_id,
-						 const unsigned int save_step) const
-{
-	DataOut<dim> data_out;
-	data_out.attach_dof_handler(chemical_base->get_dof_handler());
+// template<int dim>
+// double 
+// FE_Chemical<dim>::getMax() const
+// {
+// 	double max_value = solution[0];
 
-	std::string chemical_name = "Chemical" + Utilities::int_to_string(chem_id,3);
+// 	for(unsigned int i = 0; i < solution.size(); ++i)
+// 		max_value = std::max(max_value, solution[i]);
 
-	data_out.add_data_vector(solution, chemical_name);
-	data_out.build_patches();
-	const std::string filename = output_directory
-				  + "/"
-	              + chemical_name
-	              + "_"
-	              + Utilities::int_to_string(save_step,4)
-	              + ".vtk";
-	std::ofstream output(filename.c_str());
-	data_out.write_vtk(output);
-}
+// 	return max_value;
+// }
 
 
-template<int dim>
-void 
-FE_Chemical<dim>::output_solution(const std::string& output_directory,
-						 const unsigned int chem_id,
-						 const unsigned int save_step,
-						 const unsigned int cycle) const
-{
-	DataOut<dim> data_out;
-	data_out.attach_dof_handler(chemical_base->get_dof_handler());
+// template<int dim>
+// void 
+// FE_Chemical<dim>::output_solution(const std::string& output_directory,
+// 						 const unsigned int chem_id,
+// 						 const unsigned int save_step) const
+// {
+// 	DataOut<dim> data_out;
+// 	data_out.attach_dof_handler(chemical_base->get_dof_handler());
 
-	std::string chemical_name = "Chemical" 
-				+ Utilities::int_to_string(chem_id,3)
-				+ "_"
-	            + Utilities::int_to_string(cycle,2);
+// 	std::string chemical_name = "Chemical" + Utilities::int_to_string(chem_id,3);
 
-	data_out.add_data_vector(solution, chemical_name);
-	data_out.build_patches();
-	const std::string filename = output_directory
-				  + "/"
-	              + chemical_name
-	              + "-"
-	              + Utilities::int_to_string(save_step,4)
-	              + ".vtk";
-	std::ofstream output(filename.c_str());
-	data_out.write_vtk(output);
-}
+// 	data_out.add_data_vector(solution, chemical_name);
+// 	data_out.build_patches();
+// 	const std::string filename = output_directory
+// 				  + "/"
+// 	              + chemical_name
+// 	              + "_"
+// 	              + Utilities::int_to_string(save_step,4)
+// 	              + ".vtk";
+// 	std::ofstream output(filename.c_str());
+// 	data_out.write_vtk(output);
+// }
+
+
+// template<int dim>
+// void 
+// FE_Chemical<dim>::output_solution(const std::string& output_directory,
+// 						 const unsigned int chem_id,
+// 						 const unsigned int save_step,
+// 						 const unsigned int cycle) const
+// {
+// 	DataOut<dim> data_out;
+// 	data_out.attach_dof_handler(chemical_base->get_dof_handler());
+
+// 	std::string chemical_name = "Chemical" 
+// 				+ Utilities::int_to_string(chem_id,3)
+// 				+ "_"
+// 	            + Utilities::int_to_string(cycle,2);
+
+// 	data_out.add_data_vector(solution, chemical_name);
+// 	data_out.build_patches();
+// 	const std::string filename = output_directory
+// 				  + "/"
+// 	              + chemical_name
+// 	              + "-"
+// 	              + Utilities::int_to_string(save_step,4)
+// 	              + ".vtk";
+// 	std::ofstream output(filename.c_str());
+// 	data_out.write_vtk(output);
+// }
 
 template<int dim>
 void 	
-FE_Chemical<dim>::print(std::ostream& out, unsigned int chem_id) const
+FE_Chemical<dim>::print(std::ostream& out) const
 {
 	DataOut<dim> data_out;
 	data_out.attach_dof_handler(chemical_base->get_dof_handler());
 
 	std::string chemical_name = "Chemical" 
-				+ Utilities::int_to_string(chem_id,3);
+				+ Utilities::int_to_string(this->chemical_id, 3);
 
 	data_out.add_data_vector(solution, chemical_name);
 	data_out.build_patches();
