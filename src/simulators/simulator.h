@@ -111,8 +111,8 @@ private:
 	void reset_system(const unsigned int cycle, 
 		std::vector<TestFunctions::GaussianSolution<dim> >& gaussian_functions);
 	void solve_chemicals();
-	void process_solution(const unsigned int cycle, 
-		dealii::ConvergenceTable& convergence_table);
+	// void process_solution(const unsigned int cycle, 
+	// 	dealii::ConvergenceTable& convergence_table);
 };
 
 // IMPL
@@ -163,6 +163,7 @@ Simulator<dim>::run_microbes()
 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
 	const bool trackMicrobeChem = prm.get_bool("Debug","Track microbe chemicals");
 
+std::cout << "here" << std::endl;
 	// const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
 
 	// spread out initial bacteria:
@@ -355,7 +356,8 @@ Simulator<dim>::setup_parameters()
 	prm.print_simple(std::cout);
 	std::ofstream out(output_directory + "/parameters.dat");
 	prm.print(out);
-	prm.printLoopedParameterGrid(std::cout);
+	std::ofstream out_grid(output_directory + "/parameter_grid.dat");
+	prm.printLoopedParameterGrid(out_grid);
 	assign_local_parameters();
 }
 
@@ -416,7 +418,7 @@ Simulator<dim>::setup_bacteria()
 		bacteria.printInfo(std::cout);
 
 	std::cout << "...setting up fitness" << std::endl;
-		setup_fitness();
+		fitness_function.init(prm, chemicals);
 		fitness_function.printInfo(std::cout);
 }
 
@@ -431,16 +433,9 @@ Simulator<dim>::setup_system()
 {
 	std::cout << "\n\nSETTING UP SYSTEM\n" << std::endl;
 
-// setup geometry and grid:
 	setup_geometry_grid();
-
-// setup velocity:
 	setup_velocity();
-
-// setup chemicals:
 	setup_chemicals();
-
-// setup bacteria:
 	setup_bacteria();
 
 	std::cout << std::endl << std::endl;
@@ -486,14 +481,13 @@ Simulator<dim>::get_chemical_time_step()
 	return cfl_time_step;
 }
 
-/** \brief Setup fitness object for bacteria reproduction */
-/** @todo Move this to a fitness_handler class ... */
-template<int dim>
-void
-Simulator<dim>::setup_fitness()
-{
-	fitness_function.init(prm, chemicals);
-}
+// /** \brief Setup fitness object for bacteria reproduction */
+// * @todo Move this to a fitness_handler class ... 
+// template<int dim>
+// void
+// Simulator<dim>::setup_fitness()
+// {
+// }
 
 /** \brief Declare local parameters needed for simulator 
 * to be read in from file
@@ -520,15 +514,15 @@ Simulator<dim>::declare_parameters()
 		prm.declare_entry("Convergence check","False",Patterns::Bool());
 
 
-		prm.enter_subsection("Gaussian");
-			prm.declare_entry("Centers",
-								"{{}}",
-								Patterns::List(Patterns::List(Patterns::Double())));
-			prm.declare_entry("Amplitudes","{0,0}",
-								Patterns::List(Patterns::Double()));
-			prm.declare_entry("Widths","{0,0}",
-								Patterns::List(Patterns::Double()));
-		prm.leave_subsection();
+		// prm.enter_subsection("Gaussian");
+		// 	prm.declare_entry("Centers",
+		// 						"{{}}",
+		// 						Patterns::List(Patterns::List(Patterns::Double())));
+		// 	prm.declare_entry("Amplitudes","{0,0}",
+		// 						Patterns::List(Patterns::Double()));
+		// 	prm.declare_entry("Widths","{0,0}",
+		// 						Patterns::List(Patterns::Double()));
+		// prm.leave_subsection();
 
 	prm.leave_subsection();
 
@@ -538,7 +532,8 @@ Simulator<dim>::declare_parameters()
 	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
 	Chemicals::Controls<dim>::declare_parameters(prm);
 	Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
-	Bacteria::Fitness::declare_parameters(prm);
+	// Bacteria::Fitness::declare_parameters(prm);
+	Bacteria::TestNewFitness::Fitness_Function<dim>::declare_parameters(prm);
 }
 
 
@@ -595,6 +590,7 @@ Simulator<dim>::run_convergence_check()
 
 		for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
 		{
+	    	std::cout << std::endl << "Chemical: " << i << std::endl;
 			gaussian_functions[i].setTime(run_time + 1.0); // start at time 1.0
 			chemicals[i].process_solution(convergence_tables[i], gaussian_functions[i], cycle);
 		}
@@ -606,9 +602,11 @@ Simulator<dim>::run_convergence_check()
     std::cout << std::endl;
     for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
     {
+    	std::cout << std::endl << "Chemical: " << i << std::endl;
         convergence_tables[i].write_text(std::cout);
 
-        std::string conv_filename = "convergence_chemical";
+        std::string conv_filename = output_directory 
+        						+ "/convergence_chemical";
 
         conv_filename += "_" + dealii::Utilities::int_to_string(i, 3);
         conv_filename += ".tex";
@@ -629,8 +627,6 @@ Simulator<dim>::reset_system(const unsigned int cycle,
 	// recalc time steps??? or use min over refinements (could start with finest)
 
 	// intialize chemicals:
-	std::string section = "Debug.Gaussian";
-
 	for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
 	{
 		gaussian_functions[i].setTime(1.0);
@@ -676,13 +672,13 @@ Simulator<dim>::solve_chemicals()
 
 }
 
-template <int dim>
-void 
-Simulator<dim>::process_solution(const unsigned int cycle, 
-	dealii::ConvergenceTable& convergence_table)
-{
+// template <int dim>
+// void 
+// Simulator<dim>::process_solution(const unsigned int cycle, 
+// 	dealii::ConvergenceTable& convergence_table)
+// {
 
-}
+// }
 
 
 

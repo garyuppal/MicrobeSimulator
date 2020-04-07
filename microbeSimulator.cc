@@ -17,6 +17,7 @@
 // todo:
 //               Assert(false, ExcNotImplemented());
 
+// print info for velocity
 
 // - add easy chemical debug ...
 
@@ -94,8 +95,8 @@ int main(int argc, char** argv)
 		if(cmd_prm.getDimension() == 2)
 		{
 			Simulation::Simulator<2> sim(cmd_prm);
-			// sim.run();
-			sim.run_convergence_check();			
+			sim.run();
+			// sim.run_convergence_check();			
 				// FullSimulator<2> fsim(cmd_prm);
 				// fsim.run();
 		}

@@ -6,14 +6,15 @@
 // direct solver:
 #include <deal.II/lac/sparse_direct.h>
 
-#include "../utility/cell_iterator_map.h" // switch to field class ... or actual map
 
 #include "./chemical_fe_base.h"
 #include "./chemical_interface.h"
 #include "./fe_chemical.h"
 
 #include "./control_functions.h"
+
 #include "../utility/fe_tools.h"
+#include "../utility/cell_iterator_map.h" // switch to field class ... or actual map
 
 #include "../utility/parameter_handler.h"
 

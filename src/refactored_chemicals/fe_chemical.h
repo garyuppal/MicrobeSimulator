@@ -12,6 +12,9 @@
 #include "../utility/fe_tools.h"
 #include "../utility/parameter_handler.h"
 
+#include "../utility/fe_tools.h"
+#include "../utility/cell_iterator_map.h" // switch to field class ... or actual map
+
 // check new chem interface, there shouldn't be any access methods not part of interface
 // initialization should be through constrcutor only
 
@@ -87,13 +90,14 @@ public:
 
 
 private:
-	// const Chemical_FE_Base<dim>*	chemical_base;
 	std::shared_ptr<Chemical_FE_Base<dim> >					chemical_base; 
 
-	double 							diffusion_constant;
-	double 							decay_constant;
+	// inherited:
+	// double 							diffusion_constant;
+	// double 							decay_constant;
+	// double 							time_step;
+
 	double 							viscosity_beta;
-	double 							time_step;
 
 	// chemical objects:
 	SparseMatrix<double>			system_matrix;
@@ -342,7 +346,7 @@ FE_Chemical<dim>::update_rhs(const std::vector<Point<dim> >& locations,
 {
 	update_rhs(); // RHS = MU^{k-1}
 	update_source_vector(locations, amounts);
-	right_hand_side.add(time_step, source); // RHS += k*S
+	right_hand_side.add(this->time_step, source); // RHS += k*S
 }
 
 template<int dim>
@@ -354,7 +358,7 @@ FE_Chemical<dim>::update_rhs(const std::vector<Point<dim> >& locations,
 	update_rhs(); // RHS = MU^{k-1}
 	// ***FEM SCHEME FOR CONTROL FUNCTION: add control to right hand side
 	update_source_vector(locations, amounts);
-	right_hand_side.add(time_step, source); // RHS += k*S
+	right_hand_side.add(this->time_step, source); // RHS += k*S
 	// project onto FEM vector:
 	VectorTools::project(chemical_base->get_dof_handler(),
 					chemical_base->get_constraints(),
@@ -364,7 +368,7 @@ FE_Chemical<dim>::update_rhs(const std::vector<Point<dim> >& locations,
 
 	// control_function_fem_vector.print(std::cout); 
 	// add control to rhs:
-	right_hand_side.add(time_step, control_function_fem_vector);
+	right_hand_side.add(this->time_step, control_function_fem_vector);
 }
 
 
@@ -481,13 +485,13 @@ FE_Chemical<dim>::setup_solver()
 				{
 					cell_matrix(i,j) += (
 						// mass terms:
-						(1. + decay_constant*time_step)*phi[i]*phi[j]
+						(1. + (this->decay_constant)*(this->time_step) )*phi[i]*phi[j]
 				
 						// diffusion + artificial viscosity:
-						+ grad_phi[i]*( (diffusion_constant + nu)*time_step )*grad_phi[j]
+						+ grad_phi[i]*( (this->diffusion_constant + nu)*(this->time_step) )*grad_phi[j]
 				
 						// advection: ( maybe see what happens if integrating by parts here ...)
-						+ phi[i]*time_step*velocity*grad_phi[j]
+						+ phi[i]*this->time_step*velocity*grad_phi[j]
 
 						// robin boundary (no flux) terms:
 						// +  ...
@@ -683,10 +687,10 @@ FE_Chemical<dim>::printInfo(std::ostream& out) const
 		<< "\t\t FE CHEMICAL INFO:"
 		<< "\n-----------------------------------------------------" << std::endl;
 
-   	out << "Diffusion constant: " << diffusion_constant << std::endl
-   		<< "Decay constant: " << decay_constant << std::endl
+   	out << "Diffusion constant: " << this->diffusion_constant << std::endl
+   		<< "Decay constant: " << this->decay_constant << std::endl
    		<< "Viscosity beta: " << viscosity_beta << std::endl
-   		<< "Time step: " << time_step << std::endl;
+   		<< "Time step: " << this->time_step << std::endl;
 
 	out << "\n-----------------------------------------------------\n\n" << std::endl;
 }

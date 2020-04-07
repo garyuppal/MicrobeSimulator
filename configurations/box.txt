@@ -2,7 +2,7 @@
 
 set Simulator type = Bacteria
 set Time step = 0.001 
-set Run time = 1.0
+set Run time = 10.0
 set Save period = 0.1
 
 subsection Advection
@@ -17,8 +17,8 @@ subsection Geometry
 	set Geometry type = Box 
 
 	subsection Box
-		set Bottom left = {-10,-10}
-		set Top right = {10,10}
+		set Bottom left = {-5,-5}
+		set Top right = {5,5}
 		set Boundary conditions = {WRAP, WRAP}
 	end
 end 
@@ -27,7 +27,7 @@ subsection Mesh
 	set Global refinement = 1
 	set Obstacle refinement = 0
 	set Boundary refinement = 0
-	set Max cell size = 1.0
+	set Max cell size = 0.6
 end
 
 subsection Chemicals
@@ -43,22 +43,27 @@ end
 subsection Bacteria
 	set Number bacteria = 100
 	set Number groups = 1
-	set Initial locations = {{}}  
+	set Initial locations = {{0,0}}  
 	set Diffusion = 0.1
-	set Edge buffer = 0.2
+	set Edge buffer = 0
 	set Secretion rate = {100,100}
 	set Mutation rate = 0.00000
 	set Mutation strength = 100; 
 	set Deterministic number mutate = 0
 	set Deterministic mutate time = 0
-	set Reintroducing = True
-	set Reintroduction period = 2.0
+	set Reintroducing = False
+	set Reintroduction period = 0.0
 	set Left subdomain length = -1
 end
 
 subsection Fitness
 	set Fitness type = OR
-	set Chemical fitness = {7.5,-8.0}
-	set Secretion cost = 0.02
-	set Chemical saturation = {0.01,0.1}
+
+	subsection OR
+		set Benefit = 75 
+		set Harm = 80
+		set Benefit saturation = 0.01
+		set Harm saturation = 0.1
+		set Secretion cost = 0.2
+	end
 end

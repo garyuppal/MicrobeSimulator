@@ -375,7 +375,7 @@ AND_Fitness<dim>::AND_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& c
 	:
 	FitnessBase<dim>(ch)
 {
-	std::string subsection = "Fitness.OR";
+	std::string subsection = "Fitness.AND";
 
 	benefit = prm.get_double(subsection, "Benefit");
 	harm = prm.get_double(subsection, "Harm");

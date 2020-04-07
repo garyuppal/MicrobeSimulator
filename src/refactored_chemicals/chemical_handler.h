@@ -23,6 +23,10 @@
 #include "./fdm_chemical.h"
 #include "./fe_chemical.h"
 
+
+#include "../utility/fe_tools.h"
+#include "../utility/cell_iterator_map.h" // switch to field class ... or actual map
+
 // finite elements:
 // #include "./chemical_fe_base.h" // cg_support and dg_support classes
 
@@ -87,6 +91,9 @@ private:
 	// but then, instead of baseinit, just check if cg or dg type chem has already been declared
 
 	std::shared_ptr<Chemical_FE_Base<dim> >					cg_base; // needs triangulation to initialize
+	
+	std::shared_ptr<FETools::PointCellMap<dim> >			point_cell_map;
+
 	std::vector<std::shared_ptr<ChemicalInterface<dim> > > 	chemicals; 
 };
 
@@ -154,6 +161,13 @@ ChemicalHandler<dim>::init(const ParameterHandler& prm,
 				cg_base = std::make_shared<Chemical_FE_Base<dim> >(tria); // need to include velocity function? // could also init i suppose
 				cg_base->setup(velocity_function, geo.getBoundaryConditions()); // move to constructor ...
 				baseInit = true; 
+
+				// switch to field or map...:
+				point_cell_map = std::make_shared<FETools::PointCellMap<dim> >();
+				point_cell_map->initialize(geo, cg_base->get_dof_handler(), 0.1 /* source resolution */);
+				// can do initialization in constructor		
+
+				cg_base->attach_point_cell_map(point_cell_map); // probably want to use shared pointer in fe base class
 			}
 			chemicals.emplace_back(
 				std::make_shared<FE_Chemical<dim> >(prm, time_step, i, cg_base) );
