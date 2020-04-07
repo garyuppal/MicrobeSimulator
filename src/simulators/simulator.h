@@ -19,8 +19,9 @@ using dealii::Triangulation;
 
 #include <array>
 #include <algorithm>
-#include <deal.II/base/function.h>
 
+#include <deal.II/base/function.h>
+#include <deal.II/base/convergence_table.h>
 
 /** \brief Main namespace for MicrobeSimulator */
 namespace MicrobeSimulator{ 
@@ -48,7 +49,10 @@ class Simulator{
 public:
 	Simulator(const CommandLineParameters& cmd_prm);
 
+	// if adding other, multiple types of simulation, can maybe have cmd_parser select which on,
+	// or create simulator interface and separate classes...
 	void run();
+	void run_convergence_check();
 private:
 	ParameterHandler prm;
 
@@ -56,23 +60,18 @@ private:
 	Geometry<dim> 							geometry;
 	Velocity::AdvectionHandler<dim>			velocity_function;
 
-	// Chemicals::ChemicalHandler<dim> 		chemicals;
 	RefactoredChemicals::ChemicalHandler<dim> chemicals;
-
 	RefactoredChemicals::Controls<dim>			control_functions;
 
 	Bacteria::BacteriaHandler<dim>			bacteria;
-
-	// Bacteria::OR_Fitness<dim>				fitness_function;
-		/** @todo type of fitness given by parameter as well */
 	Bacteria::TestNewFitness::Fitness_Function<dim>	 fitness_function;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;
 	double 									run_time;
 	double 									time;
-	double 									chemical_time_step;
-	double 									bacteria_time_step;
+	double 									chemical_time_step; // get from handler?
+	double 									bacteria_time_step; // get from bacteria?
 	double 									save_period;
 	unsigned int 							save_step_number;
 	unsigned int 							time_step_number;
@@ -108,13 +107,12 @@ private:
 	// Simulators:
 	void run_microbes();
 
-	// void run_chemicals_only(); // for debugging purposes
-		// void intialize_chemicals(); 
-
-	void run_convergence_check();
-	// // DEBUGGING METHODS:
-	// void setup_debug();
-	// void run_debug(); 
+	// FOR CONVERGENCE TEST:
+	void reset_system(const unsigned int cycle, 
+		std::vector<TestFunctions::GaussianSolution<dim> >& gaussian_functions);
+	void solve_chemicals();
+	void process_solution(const unsigned int cycle, 
+		dealii::ConvergenceTable& convergence_table);
 };
 
 // IMPL
@@ -144,35 +142,8 @@ void
 Simulator<dim>::run()
 {
 	setup_parameters();
-
-	// const bool gridOnly = prm.get_bool("Debug", "Grid only");
-	// const bool chemicalsOnly = prm.get_bool("Debug", "Chemicals only");
-	// const bool testConvergence = prm.get_bool("Debug", "Convergence check");
-
-	// // options here to run other simulations/tests:
-	// if(gridOnly)
-	// {
-	// 	setup_geometry_grid();
-	// }
-	// else if(chemicalsOnly)
-	// {
-	// 	setup_geometry_grid();
-	// 	setup_velocity();
-	// 	setup_chemicals();
-	// 	run_chemicals_only();
-	// }
-	// else if(testConvergence)
-	// {
-	// 	setup_geometry_grid();
-	// 	setup_velocity();
-	// 	setup_chemicals();
-	// 	run_convergence_check();
-	// }
-	// else
-	// {
-		setup_system();
-		run_microbes();
-	// }
+	setup_system();
+	run_microbes();
 }
 
 /** \brief Run evolving microbe simulation */
@@ -258,91 +229,6 @@ Simulator<dim>::run_microbes()
 		output_vector(bacteria.get_pg_rates(),
 			"pg_rates",output_directory);
 } // run_microbes()
-
-// template<int dim>
-// void
-// Simulator<dim>::run_chemicals_only()
-// {
-// 	std::cout << std::endl << std::endl
-// 		<< "Starting chemicals debugging simulation" << std::endl
-// 		<< Utility::long_line << std::endl
-// 		<< Utility::long_line << std::endl << std::endl;
-
-// 	// save period:
-// 	const unsigned int modsave
-// 		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
-// 	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
-// 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
-
-// 	// intialize chem field:
-// 	intialize_chemicals();
-
-// 	do{
-// 		// update time:
-// 		time += chemical_time_step;
-// 		++time_step_number;
-
-// 		// output:
-// 		if(time_step_number % modsave == 0)
-// 		{
-// 			std::cout << "saving at time: " << time << std::endl;
-// 			if(isSavingChemicals)
-// 				output_chemicals();
-// 			if(recordMass)
-// 				output_chemical_mass();
-
-// 			++save_step_number;
-// 		}
-
-// 		// add option of only controls...
-// 		chemicals.update(); 
-
-// 	}while( time < run_time );
-
-// }
-
-// template<int dim>
-// void
-// Simulator<dim>::intialize_chemicals()
-// {
-// 	std::string section = "Debug.Gaussian";
-// 	const unsigned int one = 0;
-// 	const unsigned int two = 1;
-
-// 	Point<dim> center_one = prm.get_point_list(section, "Centers")[one];
-// 	Point<dim> center_two = prm.get_point_list(section, "Centers")[two];
-
-// 	double amp_one = prm.get_double_vector(section, "Amplitudes")[one];
-// 	double amp_two = prm.get_double_vector(section, "Amplitudes")[two];
-
-// 	double wid_one = prm.get_double_vector(section, "Widths")[one];
-// 	double wid_two = prm.get_double_vector(section, "Widths")[two];
-
-// 	TestFunctions::Gaussian<dim> gauss_one(center_one, amp_one, wid_one);
-// 	TestFunctions::Gaussian<dim> gauss_two(center_two, amp_two, wid_two);
-
-// 	chemicals.project_function(one, gauss_one);
-// 	chemicals.project_function(two, gauss_two);
-// }
-
-/** \brief CONVERGENCE CHECKS WITH MESH REFINEMENT */
-/** Solutions are time dependent so we may want to querry accuracy at different 
-* time steps.
-*/
-template<int dim>
-void
-Simulator<dim>::run_convergence_check()
-{
-	// ConvergenceTable convergence_table;
-
-	std::cout << std::endl << std::endl
-		<< "Running Convergence checks..." << std::endl
-		<< Utility::long_line << std::endl
-		<< Utility::long_line << std::endl << std::endl;
-
-
-
-}
 
 /** \brief Method to reintoduce new microbe groups into simulation */
 template<int dim>
@@ -657,60 +543,146 @@ Simulator<dim>::declare_parameters()
 
 
 // METHODS TO CHECK CONVERGENCE:
-// template <int dim>
-// void 
-// Simulator<dim>::process_solution(const unsigned int cycle)
-// {
-// 	Vector<float> difference_per_cell(triangulation.n_active_cells());
-// 	VectorTools::integrate_difference(dof_handler,
-// 	                              solution,
-// 	                              Solution<dim>(),
-// 	                              difference_per_cell,
-// 	                              QGauss<dim>(fe->degree + 1),
-// 	                              VectorTools::L2_norm);
-// 	const double L2_error =
-// 		VectorTools::compute_global_error(triangulation,
-// 		                                difference_per_cell,
-// 		                                VectorTools::L2_norm);
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
 
-// 	VectorTools::integrate_difference(dof_handler,
-// 	                              solution,
-// 	                              Solution<dim>(),
-// 	                              difference_per_cell,
-// 	                              QGauss<dim>(fe->degree + 1),
-// 	                              VectorTools::H1_seminorm);
-// 	const double H1_error =
-// 		VectorTools::compute_global_error(triangulation,
-// 		                                difference_per_cell,
-// 		                                VectorTools::H1_seminorm);
+// TODO: get exact and initial solutions from parameters (depends on bcs too)
+// resetting system, redoing grid ...
+// outputting final results
 
-// 	const QTrapez<1>     q_trapez;
-// 	const QIterated<dim> q_iterated(q_trapez, fe->degree * 2 + 1);
-// 	VectorTools::integrate_difference(dof_handler,
-// 	                              solution,
-// 	                              Solution<dim>(),
-// 	                              difference_per_cell,
-// 	                              q_iterated,
-// 	                              VectorTools::Linfty_norm);
-// 	const double Linfty_error =
-// 		VectorTools::compute_global_error(triangulation,
-// 		                                difference_per_cell,
-// 		                                VectorTools::Linfty_norm);
+/** \brief CONVERGENCE CHECKS WITH MESH REFINEMENT */
+/** Solutions are time dependent so we may want to querry accuracy at different 
+* time steps.
+*/
+template<int dim>
+void
+Simulator<dim>::run_convergence_check()
+{	
+	TestFunctions::GaussianSolution<dim>::declare_parameters(prm);
 
-// 	const unsigned int n_active_cells = triangulation.n_active_cells();
-// 	const unsigned int n_dofs         = dof_handler.n_dofs();
+	setup_parameters();
+	setup_geometry_grid();
+	setup_velocity();
+	setup_chemicals();
 
-// 	std::cout << "Cycle " << cycle << ':' << std::endl
-// 	      << "   Number of active cells:       " << n_active_cells
-// 	      << std::endl
-// 	      << "   Number of degrees of freedom: " << n_dofs << std::endl;
-// 	convergence_table.add_value("cycle", cycle);
-// 	convergence_table.add_value("cells", n_active_cells);
-// 	convergence_table.add_value("dofs", n_dofs);
-// 	convergence_table.add_value("L2", L2_error);
-// 	convergence_table.add_value("H1", H1_error);
-// 	convergence_table.add_value("Linfty", Linfty_error);
-// }
+	// convergence tables for each chemical:
+	std::vector<dealii::ConvergenceTable> convergence_tables; // one for each chemical
+	for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+		convergence_tables.emplace_back( dealii::ConvergenceTable() );
+
+	std::cout << std::endl << std::endl
+		<< "Running Convergence checks..." << std::endl
+		<< Utility::long_line << std::endl
+		<< Utility::long_line << std::endl << std::endl;
+
+	// solutions (for each chemical):
+	std::vector<TestFunctions::GaussianSolution<dim> > gaussian_functions;
+	for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+		gaussian_functions.emplace_back(
+			TestFunctions::GaussianSolution<dim>(prm, geometry, i) );
+
+	// try one cycle first
+	unsigned int cycle = 0; // for loop over total
+	{
+		std::cout << "CYCLE " << cycle << ":" << std::endl
+			<< Utility::medium_line << std::endl;
+
+		reset_system(cycle, gaussian_functions);	// ***refine mesh and project intial function 
+		solve_chemicals(); // evolve chemicals upto given time ... need cycle for saving?
+
+
+
+		for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+		{
+			gaussian_functions[i].setTime(run_time + 1.0); // start at time 1.0
+			chemicals[i].process_solution(convergence_tables[i], gaussian_functions[i], cycle);
+		}
+
+		std::cout << std::endl << std::endl;
+	} // for all cycles
+
+	// OUTPUT
+    std::cout << std::endl;
+    for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+    {
+        convergence_tables[i].write_text(std::cout);
+
+        std::string conv_filename = "convergence_chemical";
+
+        conv_filename += "_" + dealii::Utilities::int_to_string(i, 3);
+        conv_filename += ".tex";
+        std::ofstream table_file(conv_filename);
+        convergence_tables[i].write_tex(table_file);
+    }
+} // run_convergence_check()
+
+template<int dim>
+void 
+Simulator<dim>::reset_system(const unsigned int cycle, 
+	std::vector<TestFunctions::GaussianSolution<dim> >& gaussian_functions)
+{
+	// use cycle to refine mesh ...
+	time = 0;
+	time_step_number = 0;
+
+	// recalc time steps??? or use min over refinements (could start with finest)
+
+	// intialize chemicals:
+	std::string section = "Debug.Gaussian";
+
+	for(unsigned int i = 0; i < chemicals.getNumberChemicals(); ++i)
+	{
+		gaussian_functions[i].setTime(1.0);
+		
+		chemicals.project_function(gaussian_functions[i], i);
+	} // for all chemicals
+
+}
+
+template<int dim>
+void 
+Simulator<dim>::solve_chemicals()
+{
+	std::cout << "SOLVING..." << std::endl
+		<< Utility::short_line << std::endl;
+
+	// save period:
+	const unsigned int modsave
+		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
+	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
+
+	do{
+		// update time:
+		time += chemical_time_step;
+		++time_step_number;
+
+		// output:
+		if(time_step_number % modsave == 0)
+		{
+			std::cout << "saving at time: " << time << std::endl;
+			if(isSavingChemicals)
+				output_chemicals();
+			if(recordMass)
+				output_chemical_mass();
+
+			++save_step_number;
+		}
+
+		chemicals.update(); 
+
+	}while( time < run_time );
+
+}
+
+template <int dim>
+void 
+Simulator<dim>::process_solution(const unsigned int cycle, 
+	dealii::ConvergenceTable& convergence_table)
+{
+
+}
 
 
 

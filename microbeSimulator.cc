@@ -1,6 +1,8 @@
 #include "src/utility/command_line_parser.h"
 #include "src/simulators/full_simulator.h"
 
+#include "src/simulators/simulator.h"
+
 #include <list>
 #include <fstream>
 #include <iostream>
@@ -13,27 +15,25 @@
 
 // *************************************************************************************
 // todo:
+//               Assert(false, ExcNotImplemented());
+
+
+// - add easy chemical debug ...
 
 //*** parameter handler fails if no matching end in subsection for parameter files
 // maybe invoke a precheck that gives a clearer error
 
+// @todo add parameter handler pattern checking
 // also should give error if file given doesn't exist!!	
 
-// look up: Sticky Matrix: Adhesion Mechanism of the
-// Staphylococcal Polysaccharide Intercellular
-// Adhesin
-
 // MASS SEEMS TO CHANGE AS WE CROSS DIFFERENT REFINEMENT AREAS
-// not sure if this is due to wrong integration or actual bug
+// not sure if this is due to wrong integration or actual bug (downward spikes)
 // *** check also by getting chemical values at location of microbe over time
 // also test without flow, but perhaps small flow for microbes only...
-
-// - add easy chemical debug ...
 
 
 // - add circle geometries for vortex and cylindrical pipe...
 // - add a DG implementation??? // refactor chemicals	
-
 
 
 // build tests to be sure of the following:
@@ -93,8 +93,11 @@ int main(int argc, char** argv)
 		// run simulation:
 		if(cmd_prm.getDimension() == 2)
 		{
-				FullSimulator<2> sim(cmd_prm);
-				sim.run();
+			Simulation::Simulator<2> sim(cmd_prm);
+			// sim.run();
+			sim.run_convergence_check();			
+				// FullSimulator<2> fsim(cmd_prm);
+				// fsim.run();
 		}
 		else if(cmd_prm.getDimension() == 3)
 		{

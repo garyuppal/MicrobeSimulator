@@ -12,6 +12,9 @@ using dealii::Function;
 #include "../utility/parameter_handler.h"
 #include "./control_functions.h"
 
+#include <deal.II/base/convergence_table.h> // remove later
+
+
 namespace MicrobeSimulator{ 
 	/** \brief Namespace for chemical related classes and methods */
 	namespace RefactoredChemicals{
@@ -57,6 +60,11 @@ public:
 	// output
 	virtual void print(std::ostream& out) const = 0; 
 	virtual void printInfo(std::ostream& out) const = 0;
+
+	// for testing
+	virtual void process_solution(dealii::ConvergenceTable& convergence_table, // can replace by just vector of values later
+						const Function<dim>& exact_solution,
+						const unsigned int cycle) const = 0;
 
 protected:
 	double diffusion_constant;

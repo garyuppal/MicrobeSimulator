@@ -92,6 +92,7 @@ public:
 	// const FETools::PointCellMap<dim>* getPointCellMap() const; // done
 	std::shared_ptr<FETools::PointCellMap<dim> > getPointCellMap() const; // done // ***not acutally const
 
+	const Triangulation<dim>& get_triangulation() const;
 	const SparsityPattern& getSparsityPattern() const; // done
 	unsigned int get_n_dofs() const; // done
 	const SparseMatrix<double>& get_mass_matrix() const; // done
@@ -431,6 +432,12 @@ Chemical_FE_Base<dim>::getPointCellMap() const
 	return point_cell_map;
 }
 
+template<int dim>
+const Triangulation<dim>& 
+Chemical_FE_Base<dim>::get_triangulation() const 
+{
+	return *triangulation;
+}
 
 template<int dim>
 const SparsityPattern& 

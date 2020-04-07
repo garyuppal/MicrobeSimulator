@@ -63,6 +63,10 @@ public:
 	// double getTimeStep() const;
 	// unsigned int getID() const;
 
+	void process_solution(dealii::ConvergenceTable& convergence_table, // can replace by just vector of values later
+					const Function<dim>& exact_solution,
+					const unsigned int cycle) const override;
+
 private:
 	FDM_Field<dim> chemical;
 	FDM_Field<dim> auxiliary; // for updating using Forward Euler Method
@@ -459,6 +463,16 @@ FDMChemical<dim>::printInfo(std::ostream& out) const
 		<< std::endl << std::endl << std::endl;	
  	/** @todo print out field info too */
 			// chemical.printInfo(out);
+}
+
+template<int dim>
+void 
+FDMChemical<dim>::process_solution(dealii::ConvergenceTable& /* convergence_table */, 
+				const Function<dim>& /* exact_solution */,
+				const unsigned int /* cycle */) const
+{
+	std::cout << "Not implemented" << std::endl;
+	assert(false);
 }
 
 }} // CLOSE NAMESPACES
