@@ -33,8 +33,8 @@ end
 subsection Chemicals
 	set Number chemicals = 2
 	set Implementation = {FE, FE}
-	set Diffusion = {5,15}
-	set Decay rate = {50,15}
+	set Diffusion = {5,30}
+	set Decay rate = {50,2}
 	set Save chemicals = False
 	set Time step factor = 1
 	set Viscosity beta = 0.1
@@ -44,7 +44,7 @@ subsection Bacteria
 	set Number bacteria = 100
 	set Number groups = 1
 	set Initial locations = {{0,0}}  
-	set Diffusion = 0.1
+	set Diffusion = 0.05
 	set Edge buffer = 0
 	set Secretion rate = {100,100}
 	set Mutation rate = 0.00000
@@ -60,7 +60,7 @@ subsection Fitness
 	set Fitness type = OR
 
 	subsection OR
-		set Benefit = 75 
+		set Benefit = 70
 		set Harm = 80
 		set Benefit saturation = 0.01
 		set Harm saturation = 0.1

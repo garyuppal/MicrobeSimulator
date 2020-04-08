@@ -163,8 +163,6 @@ Simulator<dim>::run_microbes()
 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
 	const bool trackMicrobeChem = prm.get_bool("Debug","Track microbe chemicals");
 
-std::cout << "here" << std::endl;
-	// const bool isGridSave = prm.get_bool("Chemicals", "Grid save");
 
 	// spread out initial bacteria:
 	const unsigned int intial_spread = 15;
