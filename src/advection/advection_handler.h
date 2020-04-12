@@ -48,6 +48,8 @@ public:
 	void setup_couette(double shear);
 	void setup_square_pipe(double h, double v);
 	void setup_rankine_vortex(double gamma, double radius);
+
+	void printInfo(std::ostream& out) const;
 private:
 	std::shared_ptr<VelocityInterface<dim> >	velocity_function;
 };
@@ -223,6 +225,14 @@ void
 AdvectionHandler<dim>::setup_rankine_vortex(double gamma, double radius)
 {
 	velocity_function = std::make_shared<RankineVortex<dim> >(gamma, radius);
+}
+
+template<int dim>
+void 
+AdvectionHandler<dim>::printInfo(std::ostream& out) const
+{
+	out << "Velocity Info: " << std::endl;
+	velocity_function->printInfo(out);
 }
 
 

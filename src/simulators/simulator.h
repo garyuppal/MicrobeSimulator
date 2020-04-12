@@ -106,6 +106,7 @@ private:
 
 	// Simulators:
 	void run_microbes();
+	void init_microbe_growth();
 
 	// FOR CONVERGENCE TEST:
 	void reset_system(const unsigned int cycle, 
@@ -146,6 +147,60 @@ Simulator<dim>::run()
 	run_microbes();
 }
 
+/** \brief Initial microbe and chemical evolution without flow or mutation */
+/** To have better, more consistent and less noisy initial conditions */
+template<int dim>
+void
+Simulator<dim>::init_microbe_growth()
+{
+	Velocity::AdvectionHandler<dim>	zero_velocity;
+	zero_velocity.setup_constant(0);
+
+	const double init_growth = prm.get_double("Bacteria", "Initial growth time"); 
+	double init_time = 0;
+	unsigned int init_time_step_number = 0; 
+
+	// spread out initial bacteria:
+	const unsigned int intial_spread = 15;
+	for(unsigned int i = 0; i < intial_spread; ++i)
+		bacteria.move(chemical_time_step, geometry, zero_velocity);
+
+	double display_time = 0; 
+
+	// ``intialize group'' for T=5
+	while(init_time < init_growth){
+		
+		// update init time:
+		init_time += chemical_time_step;
+		++init_time_step_number;
+		
+		if(control_functions.isActive())
+		{
+			control_functions.update_time(chemical_time_step); // increment internal clock
+			chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates(), control_functions);
+		}
+		else
+		{
+			chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates());
+		}
+
+		if(init_time_step_number % bacteria_time_step_multiplier == 0)
+		{
+			bacteria.move(bacteria_time_step, geometry, zero_velocity);
+			bacteria.reproduce(bacteria_time_step, fitness_function);
+		}
+
+		if(init_time > display_time)
+		{
+			std::cout << "...initial growth time: " << init_time << std::endl;
+			display_time += 1.0;
+		}
+
+	} // while initial growth
+
+	std::cout << "...done initializing" << std::endl << std::endl;
+} // init_microbe_growth()
+
 /** \brief Run evolving microbe simulation */
 template<int dim>
 void
@@ -163,11 +218,7 @@ Simulator<dim>::run_microbes()
 	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
 	const bool trackMicrobeChem = prm.get_bool("Debug","Track microbe chemicals");
 
-
-	// spread out initial bacteria:
-	const unsigned int intial_spread = 15;
-	for(unsigned int i = 0; i < intial_spread; ++i)
-		bacteria.move(chemical_time_step, geometry, velocity_function);
+	init_microbe_growth(); // initializataion without flow or mutation
 
 	// check after intial spread:
 	output_bacteria();
@@ -355,6 +406,7 @@ Simulator<dim>::setup_parameters()
 	std::ofstream out(output_directory + "/parameters.dat");
 	prm.print(out);
 	std::ofstream out_grid(output_directory + "/parameter_grid.dat");
+	prm.printLoopedParameterGrid(std::cout);
 	prm.printLoopedParameterGrid(out_grid);
 	assign_local_parameters();
 }
@@ -384,6 +436,7 @@ Simulator<dim>::setup_velocity()
 	std::cout << "...setting up velocity" << std::endl;
 		velocity_function.init(prm,geometry,triangulation,output_directory);
 		GridGenerationTools::output_grid(output_directory,"after_stokes_grid",triangulation);
+		velocity_function.printInfo(std::cout);
 }
 
 /** \brief Setup up chemicals and control functions */

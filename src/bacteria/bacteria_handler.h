@@ -21,7 +21,7 @@ namespace MicrobeSimulator{
 template<int dim>
 std::vector<Point<dim> >
 get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups,
-	double buffer, double left_length)
+	double buffer, double left_start_width, double left_start_buffer)
 {
 	std::cout << "...Finding " << number_groups
 		<< " group positions" << std::endl;
@@ -43,11 +43,14 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		  	// though this should be caught by geometry builder already
 
 		  	// possibly initialize in subdomain:
-		  	if( (dim_itr == 0) && (left_length > 0) )
-		  		width = left_length; 
+		  	if( (dim_itr == 0) && (left_start_width > 0) )
+		  		width = left_start_width; 
+
+		  	if(left_start_buffer < 0)
+		  		left_start_buffer = 0;
 
 		    temp_point[dim_itr] = (width)*((double)rand() / RAND_MAX) 
-		      + geometry.getBottomLeftPoint()[dim_itr] + buffer;
+		      + geometry.getBottomLeftPoint()[dim_itr] + buffer + left_start_buffer;
 		  }
 
 		  if( geometry.isInDomain(temp_point, buffer) )
@@ -77,6 +80,7 @@ public:
 	// MODIFIERS:
 	void move(double dt, const Geometry<dim>& geometry, 
 		const Velocity::AdvectionHandler<dim>& velocity); 
+
 	void mutate(double dt);
 
 	// legacy: (remove)
@@ -110,6 +114,7 @@ private:
 	bool binary_mutation;
 	double original_rate; /** @todo need to generalize for multiple chemicals */
 	double edge_buffer; 
+	double right_open_buffer;
 
 	// recording fallen bacteria:
 	std::vector<double> pg_rates;
@@ -132,7 +137,8 @@ BacteriaHandler<dim>::BacteriaHandler()
 	mutation_strength(0),
 	binary_mutation(false),
 	original_rate(0),
-	edge_buffer(0)
+	edge_buffer(0),
+	right_open_buffer(0)
 {}
 
 /** \brief Declare parameters needed to constuct bacteria */
@@ -143,8 +149,10 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Bacteria");
 		prm.declare_entry("Number bacteria","100",Patterns::Unsigned());
 		prm.declare_entry("Number groups","1",Patterns::Unsigned());
+		prm.declare_entry("Initial growth time","0",Patterns::Double());
 		prm.declare_entry("Diffusion","0.1",Patterns::Double());
 		prm.declare_entry("Edge buffer","0",Patterns::Double());
+		prm.declare_entry("Right open buffer","0",Patterns::Double());
 		prm.declare_entry("Secretion rate",
 							"{100,100}",
 							Patterns::List(Patterns::Double()));
@@ -160,7 +168,8 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 		prm.declare_entry("Reintroducing","False",Patterns::Bool());
 		prm.declare_entry("Reintroduction period","0",Patterns::Double());
 		// left length, for reintoduction
-		prm.declare_entry("Left subdomain length","-1",Patterns::Double());
+		prm.declare_entry("Left start width","-1",Patterns::Double());
+		prm.declare_entry("Left start buffer","0",Patterns::Double());
 	prm.leave_subsection();
 }
 
@@ -179,6 +188,7 @@ BacteriaHandler<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo
 	/** @todo generalize this to multiple possible chemicals */
 	original_rate = prm.get_double_vector(section, "Secretion rate")[0];
 	edge_buffer = prm.get_double(section,"Edge buffer");
+	right_open_buffer = prm.get_double(section, "Right open buffer");
 
 	// add bacteria:
 	const unsigned int n_bact = prm.get_unsigned(section, "Number bacteria");
@@ -217,9 +227,12 @@ BacteriaHandler<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<d
 	{
 		if(number_groups == 0)
 			number_groups = n_bact;
-		const double left_length = prm.get_double(section, "Left subdomain length");
+		
+		const double left_start_width = prm.get_double(section, "Left start width");
+		const double left_start_buffer = prm.get_double(section, "Left start buffer");
+
 		initial_locations = get_bacteria_locations(geo, number_groups, 
-			edge_buffer, left_length);
+			edge_buffer, left_start_width, left_start_buffer);
 	}
 
 	for(unsigned int i = 0; i < n_bact; ++i)
@@ -242,7 +255,7 @@ BacteriaHandler<dim>::move(double dt, const Geometry<dim>& geometry,
 
 	// if boundary is open, remove fallen bacteria:
 	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
-		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0],
+		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0] - right_open_buffer,
 											pg_rates);	
 
 }
@@ -260,7 +273,7 @@ BacteriaHandler<dim>::mutate(double dt)
 			double sec = original_rate;
 			if(binary_mutation)
 			{
-				double current_sec = (*it)->getSecretionRate(0);
+				double current_sec = (*it)->getSecretionRate(0);	
 				if(current_sec > 0)
 					sec = 0;
 			}
@@ -499,6 +512,7 @@ BacteriaHandler<dim>::printInfo(std::ostream& out) const
 		<< "\t Mutation rate: " << mutation_rate << std::endl
 		<< "\t Mutation strength: " << mstren << std::endl
 		<< "\t Edge buffer: " << edge_buffer << std::endl
+		<< "\t Right open buffer: " << right_open_buffer << std::endl
 		<< "\t Number bacteria: " << bacteria.size() << std::endl
 		<< "\t First Bacterium: " << bacteria[0]->getLocation() << std::endl
 		<< "\t First secretion rates:";

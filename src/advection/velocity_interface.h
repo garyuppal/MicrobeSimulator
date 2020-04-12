@@ -33,6 +33,8 @@ public:
 	// value list: (shouldn't need to be overridden):
 	void value_list(const std::vector<Point<dim> >& points,
 					std::vector<Tensor<1, dim> >& values) const;
+
+	virtual void printInfo(std::ostream& out) const = 0;
 };
 
 // default implementation for value_list

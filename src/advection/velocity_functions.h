@@ -1,10 +1,9 @@
 #ifndef MICROBESIMULATOR_VELOCITY_FUNCTIONS_H
 #define MICROBESIMULATOR_VELOCITY_FUNCTIONS_H
 
-/** A collection of analytic velocity functions for ``simple geometries''
+/** @file A collection of analytic velocity functions for ``simple geometries''
 * usually handled with AdvectionHandler class
-* ... for cylindrical and vortex velocities, still need to implement 
-* cylindrical type geometry and mesh for bacteria and chemicals...
+* @todo for cylindrical and vortex velocities, still need to implement 
 */
 
 #include "./velocity_interface.h"
@@ -12,10 +11,12 @@
 namespace MicrobeSimulator{ namespace Velocity{
 	using namespace dealii;
 
-// ********************************************************************
-/** CONSTANT FLOW
-*/
+// -------------------------------------------------------------------------------
+// CONSTANT
+// -------------------------------------------------------------------------------
 
+/** \brief Constant flow in x direction
+*/
 template<int dim>
 class Constant : public VelocityInterface<dim>{
 public:
@@ -28,24 +29,29 @@ public:
 	double getFlowRate() const;
 	void setFlowRate(double r);
 
+	void printInfo(std::ostream& out) const override;
+
 private:
 	double 	flow_rate;
 };
 
 // IMPLEMENTATION:
 // --------------------------------------------------------------------
+/** \brief Constant flow constructor */
 template<int dim>
 Constant<dim>::Constant()
 	:
 	flow_rate(0)
 {}
 
+/** \brief Construct constant flow with given flow rate */
 template<int dim>
 Constant<dim>::Constant(double r)
 	:
 	flow_rate(r)
 {}
 
+/** Return vector value of flow rate at given point */
 template<int dim>
 Tensor<1, dim>
 Constant<dim>::value(const Point<dim>& /* location */) const
@@ -55,6 +61,7 @@ Constant<dim>::value(const Point<dim>& /* location */) const
 	return v;
 }
 
+/** Return maximum possible flow for given function */
 template<int dim>
 double 
 Constant<dim>::get_maximum_velocity(double /* max_coordinate */) const
@@ -62,6 +69,7 @@ Constant<dim>::get_maximum_velocity(double /* max_coordinate */) const
 	return flow_rate;
 }
 
+/** Get flow rate for constant flow */
 template<int dim>
 double 
 Constant<dim>::getFlowRate() const
@@ -69,6 +77,7 @@ Constant<dim>::getFlowRate() const
 	return flow_rate;
 }
 
+/** Set flow rate of constant flow */
 template<int dim>
 void 
 Constant<dim>::setFlowRate(double r)
@@ -76,10 +85,23 @@ Constant<dim>::setFlowRate(double r)
 	flow_rate = r;
 }
 
-// ********************************************************************
-/** COUETTE FLOW
-*/
+/** \brief Print info for constant flow */
+template<int dim>
+void 
+Constant<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\tConstant flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Flow rate: " << flow_rate << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
 
+// -------------------------------------------------------------------------------
+// COUETTE FLOW
+// -------------------------------------------------------------------------------
+
+/** \brief Couette flow in x direction for linear shear type flow */
 template<int dim>
 class Couette : public VelocityInterface<dim>{
 public:
@@ -92,24 +114,30 @@ public:
 	double getShearRate() const;
 	void setShearRate(double s) const;
 
+	void printInfo(std::ostream& out) const override;
+
 private:
 	double shear; // value at p[0] == 1 (dv/dr)
 };
 
 // IMPLEMENTATION:
 // --------------------------------------------------------------------
+
+/** \brief Default constructor */
 template<int dim>
 Couette<dim>::Couette()
 	:
 	shear(0)
 {}
 
+/** \brief Construct Couette flow with given shear rate */
 template<int dim>
 Couette<dim>::Couette(double r)
 	:
 	shear(r)
 {}
 
+/** \brief Return value of Couette flow function at given location */
 template<int dim>
 Tensor<1, dim>
 Couette<dim>::value(const Point<dim>& location ) const
@@ -119,6 +147,7 @@ Couette<dim>::value(const Point<dim>& location ) const
 	return v;
 }
 
+/** \brief Get maximum possible velocity of Couette flow */
 template<int dim>
 double 
 Couette<dim>::get_maximum_velocity(double max_coordinate) const
@@ -126,6 +155,7 @@ Couette<dim>::get_maximum_velocity(double max_coordinate) const
 	return shear*std::fabs(max_coordinate);
 }
 
+/** \brief Get shear rate */
 template<int dim>
 double 
 Couette<dim>::getShearRate() const
@@ -133,6 +163,7 @@ Couette<dim>::getShearRate() const
 	return shear;
 }
 
+/** \brief Set shear rate */
 template<int dim>
 void 
 Couette<dim>::setShearRate(double s) const
@@ -140,10 +171,24 @@ Couette<dim>::setShearRate(double s) const
 	shear = s;
 }
 
-// ********************************************************************
-/** SQUAREPIPE: HAGEN-POISEUILLE FLOW FOR 2D AND 3D SQUARE PIPES
-*/
+/** \brief Print info for Couette flow */
+template<int dim>
+void 
+Couette<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Couette flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Shear rate: " << shear << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
 
+// -------------------------------------------------------------------------------
+// SQUAREPIPE: HAGEN-POISEUILLE FLOW FOR 2D AND 3D SQUARE PIPES
+// -------------------------------------------------------------------------------
+
+/** \brief Square pipe type flow */
+/** Hagen-Poiseuille flow for 2D and 3D with square cross section in x direction */
 template<int dim>
 class SquarePipe : public VelocityInterface<dim>{
 public:
@@ -158,6 +203,9 @@ public:
 
 	void setHeight(double h);
 	void setMaxVelocity(double v);
+
+	void printInfo(std::ostream& out) const override;
+
 private:
 	double height;
 	double vmax;
@@ -165,6 +213,7 @@ private:
 
 // IMPLEMENTATION:
 // --------------------------------------------------------------------
+/** \brief Default constructor for square pipe flow */
 template<int dim>
 SquarePipe<dim>::SquarePipe()
 	:
@@ -172,6 +221,7 @@ SquarePipe<dim>::SquarePipe()
 	vmax(0)
 {}
 
+/** \brief Square pipe flow constructor with given height and max flow rate */
 template<int dim>
 SquarePipe<dim>::SquarePipe(double h, double v)
 	:
@@ -179,7 +229,7 @@ SquarePipe<dim>::SquarePipe(double h, double v)
 	vmax(v)
 {}
 
-// value for 2d:
+/** \brief Specialized value for 2D flow */
 template<>
 Tensor<1, 2>
 SquarePipe<2>::value(const Point<2>& location ) const
@@ -189,14 +239,7 @@ SquarePipe<2>::value(const Point<2>& location ) const
 	return v;
 }
 
-template<int dim>
-double 
-SquarePipe<dim>::get_maximum_velocity(double /* max_coordinate */) const
-{
-	return vmax;
-}
-
-// value for 3d:
+/** \brief Specialized value for 3D flow */
 template<>
 Tensor<1, 3>
 SquarePipe<3>::value(const Point<3>& location ) const
@@ -205,6 +248,14 @@ SquarePipe<3>::value(const Point<3>& location ) const
 	v[0] = vmax*(1. - (location[1]*location[1])/(height*height) )
 				*(1. - (location[2]*location[2])/(height*height) ); 
 	return v;
+}
+
+/** \brief Get maximum possible flow rate */
+template<int dim>
+double 
+SquarePipe<dim>::get_maximum_velocity(double /* max_coordinate */) const
+{
+	return vmax;
 }
 
 template<int dim>
@@ -235,6 +286,19 @@ SquarePipe<dim>::setMaxVelocity(double v)
 	vmax = v;
 }
 
+/** \brief Print info for square pipe type flow */
+template<int dim>
+void 
+SquarePipe<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Square pipe (Hagen-Poiseuille) flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Maximum velocity: " << vmax << std::endl
+		<< "Height: " << height << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
 // ********************************************************************
 /** RANKINE VORTEX: Extruded for 3d
 */
@@ -253,6 +317,8 @@ public:
 
 	void setCirculation(double gamma);
 	void setRadius(double r);
+
+	void printInfo(std::ostream& out) const override;
 private:
 	double circulation;
 	double radius;
@@ -324,6 +390,18 @@ RankineVortex<dim>::setRadius(double r)
 	radius = r;
 }
 
+template<int dim>
+void 
+RankineVortex<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Rankine vortex flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Circulation: " << circulation << std::endl
+		<< "Radiue: " << radius << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
 // ********************************************************************
 // 3D RECTANGULAR AND CYLINDRICAL PIPES:
 
@@ -347,6 +425,8 @@ public:
 	void setHeight(double h);
 	void setDepth(double d);
 	void setMaxVelocity(double v);
+
+	void printInfo(std::ostream& out) const override;
 private:
 	double height;
 	double depth;
@@ -436,6 +516,19 @@ RectangularPipe<dim>::setMaxVelocity(double v)
 	vmax = v;
 }
 
+template<int dim>
+void 
+RectangularPipe<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Rectangular pipe flow (3D):" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Maximum velocity: " << vmax << std::endl
+		<< "Height: " << height << std::endl
+		<< "Depth: " << depth << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
 // ********************************************************************
 /** CYLINDRICAL PIPE: HAGEN-POISEUILLE FLOW FOR 2D AND 3D CYLINDRICAL PIPES
 */
@@ -455,6 +548,8 @@ public:
 
 	void setRadius(double r);
 	void setMaxVelocity(double v);
+
+	void printInfo(std::ostream& out) const override;
 private:
 	double radius;
 	double vmax;
@@ -529,6 +624,18 @@ void
 CylindricalPipe<dim>::setMaxVelocity(double v)
 {
 	vmax = v;
+}
+
+template<int dim>
+void 
+CylindricalPipe<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Cylindrical pipe flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Maximum velocity: " << vmax << std::endl
+		<< "Radius: " << radius << std::endl
+		<< Utility::short_line << std::endl << std::endl;
 }
 
 

@@ -140,7 +140,7 @@ public:
 	virtual void refine_global(Triangulation<dim>& tria);
 	virtual void refine_largest_cells(Triangulation<dim>& tria);
 
-	void printMeshInfo(std::ostream& out);
+	void printMeshInfo(std::ostream& out) const;
 
 protected:
 	unsigned int global_refinement;
@@ -419,7 +419,7 @@ BuilderBase<dim>::refine_largest_cells(Triangulation<dim>& triangulation)
 /** \brief Display mesh refinement info */
 template<int dim>
 void 
-BuilderBase<dim>::printMeshInfo(std::ostream& out)
+BuilderBase<dim>::printMeshInfo(std::ostream& out) const
 {
 	out << Utility::short_line << std::endl
 		<< "\tMESH:" << std::endl
@@ -691,7 +691,12 @@ Filter<dim>::Filter(const ParameterHandler& prm)
 {
 	const std::string subsection = "Geometry.Filter";
 	number_channels = prm.get_unsigned(subsection, "Number channels");
+
+	if(number_channels == 0)
+		throw std::runtime_error("Filter geometry needs at least one channel");
+
     channel_thickness = prm.get_double(subsection, "Channel thickness");
+
 	wall_thickness = prm.get_double(subsection, "Wall thickness");
 	left_length = prm.get_double(subsection, "Left length");
 	center_length = prm.get_double(subsection, "Center length");
@@ -890,6 +895,7 @@ Filter<dim>::printInfo(std::ostream& out) const
 		<< "Left length: " << left_length << std::endl
 		<< "Center length: " << center_length << std::endl
 		<< "Right length: " << right_length << std::endl
+		<< "Fixed height: " << fixed_height << std::endl
 		<< Utility::short_line << std::endl << std::endl;
 }
 

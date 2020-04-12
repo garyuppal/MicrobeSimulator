@@ -311,6 +311,7 @@ public:
 	const DoFHandler<dim>&		get_dof_handler() const;
 	bool						isActive() const;
 
+	void printInfo(std::ostream& out) const override;
 private:
 	Triangulation<dim>* 		triangulation; // can be modified
 	const unsigned int 			stokes_degree;
@@ -871,6 +872,17 @@ bool
 StokesSolver<dim>::isActive() const
 {
 	return active;
+}
+
+template<int dim>
+void 
+StokesSolver<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t General Stokes flow:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "..." << std::endl
+		<< Utility::short_line << std::endl << std::endl;
 }
 
 

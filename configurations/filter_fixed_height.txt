@@ -17,7 +17,7 @@ subsection Geometry
 	set Geometry type = Filter 	
 
 	subsection Filter
-		set Number channels = 0:1:5.00001
+		set Number channels = 1:9:10.00001
 		set Fixed height = 8
 		set Wall thickness = 0.1
 		set Left length = 5
@@ -37,8 +37,8 @@ end
 subsection Chemicals
 	set Number chemicals = 2
 	set Implementation = {FE, FE}
-	set Diffusion = {5,30}
-	set Decay rate = {50,2}
+	set Diffusion = {5:1:5,10:10:30.001}
+	set Decay rate = {50:1:50, 5:5:25}
 	set Save chemicals = False
 	set Time step factor = 1
 	set Viscosity beta = 0.1
@@ -47,24 +47,24 @@ end
 subsection Bacteria
 	set Number bacteria = 100
 	set Number groups = 1
-	set Initial locations = {{0,0}}  
+	set Initial locations = {{}}  
 	set Diffusion = 0.05
-	set Edge buffer = 0
+	set Edge buffer = 0.05
 	set Secretion rate = {100,100}
 	set Mutation rate = 0.00000
 	set Mutation strength = 100; 
 	set Deterministic number mutate = 0
 	set Deterministic mutate time = 0
-	set Reintroducing = False
-	set Reintroduction period = 0.0
-	set Left subdomain length = -1
+	set Reintroducing = True
+	set Reintroduction period = 20.0
+	set Left subdomain length = 3
 end
 
 subsection Fitness
 	set Fitness type = OR
 
 	subsection OR
-		set Benefit = 70
+		set Benefit = 69:2:75.0001
 		set Harm = 80
 		set Benefit saturation = 0.01
 		set Harm saturation = 0.1

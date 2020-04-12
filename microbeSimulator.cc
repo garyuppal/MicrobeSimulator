@@ -15,54 +15,19 @@
 
 // *************************************************************************************
 // todo:
-//               Assert(false, ExcNotImplemented());
+// - static assertions    Assert(false, ExcNotImplemented());
+// - filter continuous mutation...
 
-// print info for velocity
-
-// - add easy chemical debug ...
-
-//*** parameter handler fails if no matching end in subsection for parameter files
-// maybe invoke a precheck that gives a clearer error
-
-// @todo add parameter handler pattern checking
-// also should give error if file given doesn't exist!!	
-
-// MASS SEEMS TO CHANGE AS WE CROSS DIFFERENT REFINEMENT AREAS
-// not sure if this is due to wrong integration or actual bug (downward spikes)
-// *** check also by getting chemical values at location of microbe over time
-// also test without flow, but perhaps small flow for microbes only...
-
+// - need to make sure bacteria time step does not cross channel ***or modify geometry class to better handle channel walls
 
 // - add circle geometries for vortex and cylindrical pipe...
 // - add a DG implementation??? // refactor chemicals	
 
-
-// build tests to be sure of the following:
-// 1) figure out if sticking is an issue (chemical mass conservation)
-// 2) groups streching, not splitting?  with pipe shear -- but seem ok in filter
-
-// also try simulation continuous version to check pattern types...
-
-// ** first establish proof of concept, try binary mutation with lower rates
-
-// switch to new fitness class
-
-// *** error using middle refined and periodic bc
-
-
-// ...
-// eventually might be nice to be able to define new variables in
-// configuration file, can then have some more flexibility with looping and such
 // - can probably speed up reproduction/death as well as perhaps other things...
+// - finish 3D implementations
 
-// - later: generalize to 3d ... can modify geomety parameter patterns accordingly
-	// - get_point_list of parameter_handler.h, generalize...
+// - eventually generalize bacteria types
 
-// - eventually generalize bacteria types....
-
-// if we want to incorporate command line parameters into the same class
-// as parameter handler, could implement a static declare parameter method
-// for simulator that we call in main before running simulation
 // *************************************************************************************
 
 int main(int argc, char** argv)
@@ -104,7 +69,7 @@ int main(int argc, char** argv)
 		{
 			std::cout << "Still need to implement some things" << std::endl;
 			// 	FullSimulator<3> sim(cmd_prm);
-			// 	sim.run();
+			// 	sim.run();				
 		}
 
 		// end time, to get run time:

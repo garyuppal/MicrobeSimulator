@@ -23,12 +23,20 @@ namespace pt = boost::property_tree;
 #include "./parameter_patterns.h"
 #include "./utility.h"
 
-// TO DO:
-// better error checking with parameter patterns
-// realize looped parameters ( default parameter before specific assignment)
-// help infomation print out
+/** @file
+* @todo better error checking with parameter patterns
+* @todo help infomation print out
+* @todo check possible infinite loop if zero step in looped paramters
+* @todo check parameter file for subsections to match with same number of end statements
+*  maybe invoke a precheck that gives a clearer error
+* @todo give error if parameter file does not exist
+* @todo eventually might be nice to be able to define new variables in
+* configuration file, can then have some more flexibility with looping and such
+* @todo if we want to incorporate command line parameters into the same class
+*  as parameter handler, could implement a static declare parameter method
+*  for simulator that we call in main before running simulation
+*/
 // cleaner print out of parameter tree
-// print out of parameter grid // done?
 
 namespace MicrobeSimulator{
 
