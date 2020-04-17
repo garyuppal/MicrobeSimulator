@@ -11,6 +11,7 @@
 
 #include "sphere.h"
 #include "hyper_rectangle.h"
+#include "line.h"
 
 #include "../utility/parameter_handler.h"
 
@@ -84,6 +85,10 @@ public:
 	unsigned int getNumberRectangles() const;
 	HyperRectangle<dim> getRectangleAt(unsigned int i) const;
 
+	// line accessors:
+	std::vector<Line> getLines() const;
+	unsigned int getNumberLines() const;
+
 	// mutators: (used by builder to constuct geometry)
 	void setBottomLeftPoint(const Point<dim>& lower); 
 	void setTopRightPoint(const Point<dim>& upper); 
@@ -93,6 +98,7 @@ public:
 	
 	void addSphere(const Sphere<dim>& sp);
 	void addRectangle(const HyperRectangle<dim>& rect);
+	void addLine(const Line& line);
 
 	// HANDLING BOUNDARIES:
 	void checkBoundaries(const Point<dim>& oldPoint, 
@@ -121,6 +127,9 @@ private:
 	// interior obstacles:
 	std::vector<Sphere<dim> > spheres;
 	std::vector<HyperRectangle<dim> > rectangles;
+
+	// bounding lines:
+	std::vector<Line> lines;
 }; // class Geometry{}
 
 
@@ -230,6 +239,23 @@ Geometry<dim>::getRectangleAt(unsigned int i) const
 	return rectangles[i];
 }
 
+// line accessors:
+/** \brief Return vector of lines in geometry */
+template<int dim>
+std::vector<Line> 
+Geometry<dim>::getLines() const
+{
+	return lines;
+}
+
+/** \brief Return number of boundary lines in geometry */
+template<int dim>
+unsigned int 
+Geometry<dim>::getNumberLines() const
+{
+	return lines.size();
+}
+
 // MUTATORS:
 // ----------------------------------------------
 
@@ -270,7 +296,7 @@ template<int dim>
 void 
 Geometry<dim>::addSphere(const Sphere<dim>& sp)
 {
-	spheres.push_back(sp);
+	spheres.emplace_back(sp);
 }
 
 /** \brief Add interior rectangle to geometry */
@@ -278,10 +304,16 @@ template<int dim>
 void 
 Geometry<dim>::addRectangle(const HyperRectangle<dim>& rect)
 {
-	rectangles.push_back(rect);
+	rectangles.emplace_back(rect);
 }
 
-
+/** \brief Add line to geometry */
+template<int dim>
+void
+Geometry<dim>::addLine(const Line& line)
+{
+	lines.emplace_back(line);
+}
 
 
 // FUNCTIONS:
@@ -320,6 +352,15 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 		{		
 			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); 
 			break;        
+		}
+
+	// check interior lines:
+	unsigned int n_lines = lines.size();
+	for(unsigned int i = 0; i < n_lines; ++i)
+		if( !lines[i].is_in_bounds(newPoint, buffer) )
+		{
+			lines[i].reflectPoint(oldPoint, newPoint, buffer);
+			break;
 		}
 
 	// check bounding box:
@@ -373,6 +414,12 @@ Geometry<dim>::isInDomain(const Point<dim>& location, double buffer) const
 	 	if( rectangles[rect].distance_from_border(location, buffer) < 1e-8)
 	   		return false;
 
+	// check interior lines:
+	unsigned int n_lines = lines.size();
+	for(unsigned int i = 0; i < n_lines; ++i)
+		if( !lines[i].is_in_bounds(location, buffer) )
+			return false;
+
 	return true;
 }
 
@@ -402,6 +449,16 @@ Geometry<dim>::addPointBuffer(const double buffer, const Point<dim>& test_point,
 			/** @todo double check this */
 			// add buffer to appropriate direction ...
 			Tensor<1, dim> normal_vector = rectangles[rect_id].getNormalVector(buffered_point);
+			buffered_point += (buffer*normal_vector);
+			break;
+		} 
+
+	// add buffer to lines:
+	unsigned int n_lines = lines.size();
+	for(unsigned int i = 0; i < n_lines; ++i)
+		if( lines[i].distance_from_line(buffered_point) < buffer )
+		{
+			Tensor<1, dim> normal_vector = lines[i].getNormalVector(buffered_point);
 			buffered_point += (buffer*normal_vector);
 			break;
 		} 
@@ -470,7 +527,6 @@ Geometry<dim>::getQuerryPoints(double resolution) const
 	return querry_points;
 } // getQuerryPoints()
 
-
 /** \brief Output informaiton about this geometry object */
 template<int dim>
 void 
@@ -501,6 +557,10 @@ Geometry<dim>::printInfo(std::ostream& out) const
 		out << "\t Bottom left: " << rectangles[i].getBottomLeft() 
 			<< "\n\t Top right: " << rectangles[i].getTopRight() << std::endl;
 
+	out << "\nLINES: " << lines.size() << std::endl;
+	for(unsigned int i = 0; i < lines.size(); ++i)
+		lines[i].printInfo(out);
+
 	out << Utility::medium_line << std::endl
 			<< std::endl << std::endl;
 }
@@ -530,6 +590,11 @@ Geometry<dim>::outputGeometry(std::string output_directory) const
 	for(unsigned int i = 0; i < rectangles.size(); ++i)
 		rect_out << rectangles[i].getBottomLeft() << " " 
 			<< rectangles[i].getTopRight() << std::endl;
+
+	// lines:
+	std::ofstream lines_out(output_directory + "/lines.dat");
+	for(unsigned int i = 0; i < lines.size(); ++i)
+		lines[i].printInfo(lines_out);
 }
 
 

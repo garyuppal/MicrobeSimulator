@@ -43,6 +43,7 @@ public:
 					double inlet_velocity,
 					unsigned int number_spheres,
 					unsigned int number_rectangles,
+					unsigned int number_lines,
 					const std::string& output_directory);
 	void setup_constant(double flow_rate);
 	void setup_couette(double shear);
@@ -105,6 +106,7 @@ AdvectionHandler<dim>::init(const ParameterHandler& prm,
 					prm.get_double(section, "Maximum velocity"),
 					geometry.getNumberSpheres(), 
 					geometry.getNumberRectangles(),
+					geometry.getNumberLines(),
 					output_directory); //parameters.getOutputDirectory());
 	}
 	else if( boost::iequals(velocity_type, "CONSTANT") )
@@ -172,6 +174,7 @@ AdvectionHandler<dim>::setup_stokes(Triangulation<dim>& tria,
 							double inlet_velocity,
 							unsigned int number_spheres,
 							unsigned int number_rectangles,
+							unsigned int number_lines,
 							const std::string& output_directory)
 {
 
@@ -192,6 +195,10 @@ AdvectionHandler<dim>::setup_stokes(Triangulation<dim>& tria,
 	unsigned int rect_id = GridGenerationTools::id_rectangle_begin;
 	for(unsigned int i = 0; i < number_rectangles; ++i, ++rect_id)
 		no_slip_ids.emplace_back(rect_id);
+
+	unsigned int line_id = GridGenerationTools::id_line_begin;
+	for(unsigned int i = 0; i < number_lines; ++i, ++line_id)
+		no_slip_ids.emplace_back(line_id);
 
 	// can also give fe_degree to constructor 
 		//.. stick with default of linear elements for now

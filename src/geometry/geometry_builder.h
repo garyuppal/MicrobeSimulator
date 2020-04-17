@@ -92,6 +92,10 @@ using dealii::Triangulation;
 	/** id of first rectangle */
 	static constexpr unsigned int id_rectangle_begin = 100;
 
+	/** id of first line */
+	static constexpr unsigned int id_line_begin = 1000;
+
+
 	// arrays for dimension independent access:
 	/** lower faces ids */
 	static constexpr std::array< unsigned int , 3 > lower_ids = {id_left, id_bottom, id_back};
@@ -130,6 +134,7 @@ public:
 	virtual void set_edge_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
 	virtual void set_sphere_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
 	virtual void set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
+	virtual void set_line_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria);
 
 	// manifolds:
 	virtual void attach_mesh_manifolds(const Geometry<dim>& geo, Triangulation<dim>& tria);
@@ -262,6 +267,43 @@ BuilderBase<dim>::set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangula
 		} // for faces
 	} // for cells
 } // set rectangle boundary ids
+
+/** \brief Set boundary labels for line boundaries */
+template<int dim>
+void 
+BuilderBase<dim>::set_line_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria)
+{
+	const std::vector<Line> lines = geo.getLines();
+	const double edge_tolerance = 1e-8;
+
+	for (typename Triangulation<dim>::active_cell_iterator
+			cell = tria.begin_active();
+			cell != tria.end();
+			++cell)
+	{
+		for(unsigned int f=0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f)
+		{
+			unsigned int bid_line = GridGenerationTools::id_line_begin;
+
+			for(unsigned int i = 0; i < lines.size(); ++i)
+			{
+				const Point<dim> p = cell->face(f)->center();
+				const double distance_to_rectangle_border =
+					std::fabs(lines[i].distance_from_line(p));
+
+				// std::cout << "distance to border = " << distance_to_rectangle_border
+				// 	<< " for point at: " << p << " and line:";
+				// lines[i].printInfo(std::cout);
+
+				if ( distance_to_rectangle_border < edge_tolerance)
+					cell->face(f)->set_boundary_id(bid_line);
+			} // for rectangles
+
+			++bid_line;
+
+		} // for faces
+	} // for cells
+} // set line boundary ids
 
 /** \brief Attach manifolds to interior spheres */
 /** Manifolds help ensure grid refinement adds verticies in correct locations.
@@ -422,7 +464,7 @@ void
 BuilderBase<dim>::printMeshInfo(std::ostream& out) const
 {
 	out << Utility::short_line << std::endl
-		<< "\tMESH:" << std::endl
+		<< "\t MESH:" << std::endl
 		<< Utility::short_line << std::endl
 		<< "Global refinement: " << global_refinement << std::endl
 		<< "Obstacle refinement: " << obstacle_refinement << std::endl
@@ -766,10 +808,6 @@ Filter<dim>::build_geometry(Geometry<dim>& geo) const
 		y_bottom += (channel_thickness + wall_thickness);
 		y_top += (channel_thickness + wall_thickness);
 	}
-
-	/** @todo or should we use base?
-	* 	geo.setBoundaryConditions(this->boundary_conditions);
-	*/
 
 	// SET PROPER BOUNDARY CONDITIONS FOR FILTER:
 	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
@@ -1186,6 +1224,339 @@ Mixer<dim>::add_mixer_ends(Triangulation<dim>& center,
 
 
 // -------------------------------------------------------------------------------
+// 		FUNNEL:
+// -------------------------------------------------------------------------------
+/** \brief Class to construct Mixer type geometry */
+/** @todo Add ability to extrude to 3D. Will require geometry bc handling
+* against cyllinders for microbes...
+*/
+template<int dim>
+class Funnel : public BuilderBase<dim>{
+public:
+	// constructor
+	Funnel(const ParameterHandler& prm);
+
+	// class parameters:
+	static void declare_parameters(ParameterHandler& prm);
+
+	// override virtual methods:
+	void build_geometry(Geometry<dim>& geo) const override; 
+	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+	void printInfo(std::ostream& out) const override;
+private:
+	double left_length;
+	double center_length;
+	double right_length;
+	double left_height;
+	double right_height;
+
+	// support methods:
+	void build_left_side(Triangulation<dim>& tria) const;
+	void build_and_attach_right_side(Triangulation<dim>& tria) const;
+	void build_and_attach_upper_triangle(Triangulation<dim>& tria) const;
+	void build_and_attach_lower_triangle(Triangulation<dim>& tria) const;
+};
+
+// IMPL
+// -------------------------------------------------------------------------
+
+// constructor
+/** \brief Constuctor for Funnel class */
+template<int dim>
+Funnel<dim>::Funnel(const ParameterHandler& prm)
+	:
+	BuilderBase<dim>(prm) // gets mesh refinement parameters
+{
+	const std::string subsection = "Geometry.Funnel";
+	left_length = prm.get_double(subsection, "Left length");
+	center_length = prm.get_double(subsection, "Center length");
+	right_length = prm.get_double(subsection, "Right length");
+	left_height = prm.get_double(subsection, "Left height");
+	right_height = prm.get_double(subsection, "Right height");
+
+	if(right_height > left_height)
+	{
+		throw std::runtime_error("not implemented with left height smaller than right");
+	}
+}
+
+// class parameters:
+template<int dim>
+void 
+Funnel<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Funnel");
+			prm.declare_entry("Left length","1",Patterns::Double());
+			prm.declare_entry("Center length","1",Patterns::Double());
+			prm.declare_entry("Right length","1",Patterns::Double());
+			prm.declare_entry("Left height","1",Patterns::Double());
+			prm.declare_entry("Right height","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+// override virtual methods:
+template<int dim>
+void 
+Funnel<dim>::build_geometry(Geometry<dim>& geo) const
+{
+	const double width = left_length + center_length + right_length;
+	const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+	Point<dim> bottom_left, top_right;
+
+	// bottom corner at origin:
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+		bottom_left[dim_itr] = 0;
+
+	top_right[0] = width;
+	top_right[1] = left_height;
+	//(left_height > right_height)? left_height : right_height; // pick max
+
+	// set bounding domain:
+	geo.setBottomLeftPoint(bottom_left);
+	geo.setTopRightPoint(top_right);
+
+	// add lines:
+	Point<2> left_start, right_end;
+
+
+	// center lines:
+	// ---------------------------
+	left_start[0] = left_length;
+	right_end[0] = left_length + center_length;
+
+	// bottom line:
+	left_start[1] = 0; // y coordinate
+	right_end[1] = half_difference;
+	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+
+	// top line:
+	left_start[1] = left_height;
+	right_end[1] = half_difference + right_height;
+	geo.addLine(Line(left_start, right_end, Line::BELOW));
+
+	// end lines:
+	// ---------------------------
+	left_start[0] = left_length + center_length;
+	right_end[0] = width;
+
+	// bottom line:
+	left_start[1] = half_difference;
+	right_end[1] = half_difference;
+	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+
+	// top line:
+	left_start[1] = half_difference + right_height; 
+	right_end[1] = half_difference + right_height;
+	geo.addLine(Line(left_start, right_end, Line::BELOW));
+
+	// SET PROPER BOUNDARY CONDITIONS FOR FUNNEL:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
+}
+
+template<int dim>
+void 
+Funnel<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
+{
+	// do a box for testing ?
+
+	build_left_side(tria);
+	build_and_attach_right_side(tria);
+	build_and_attach_lower_triangle(tria);
+	build_and_attach_upper_triangle(tria);
+}
+
+template<int dim>
+void
+Funnel<dim>::build_left_side(Triangulation<dim>& tria) const
+{
+	std::vector<double> x_divisions, y_divisions;
+
+	// coarsest needed is to accomodate right side, and triangles
+
+	// x divisions (make same as y later)
+	// x_divisions.emplace_back(left_length); // update to match right side...
+	// split center length in half to fit simplex:
+	const double hcl = 0.5*center_length;
+	if(left_length > hcl)
+	{
+		const double n_x_divs = std::round(left_length/hcl);
+		const double dx = left_length/n_x_divs;
+
+		for(unsigned int i = 0; i < n_x_divs; ++i)
+			x_divisions.emplace_back(dx);
+	}
+	else
+	{
+		x_divisions.emplace_back(left_length); 
+	} /** @todo may want to futher divide if left is much less than half center */
+
+
+	const double half_difference = 0.5*(std::fabs(left_height - right_height)); // ** store in class
+	
+	// split in half for simplex attachment
+	const double quarter_difference = 0.5*half_difference;
+	y_divisions.emplace_back(quarter_difference);
+	y_divisions.emplace_back(quarter_difference);
+	
+	// y_divisions.emplace_back(right_height);	// replace with possible subdivision
+	if(right_height > quarter_difference)
+	{
+		const double n_divs = std::round(right_height/quarter_difference);
+		const double delta = right_height/n_divs;
+
+		for(unsigned int i = 0; i < n_divs; ++i)
+			y_divisions.emplace_back(delta);
+	}
+	else
+	{
+		y_divisions.emplace_back(right_height);
+	} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+	y_divisions.emplace_back(quarter_difference);
+	y_divisions.emplace_back(quarter_difference);
+
+	const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(tria,
+                                            step_sizes,
+                                            Point<2>(0,0), // bottom corner
+                                            Point<2>(left_length, left_height));
+}
+
+template<int dim>
+void 
+Funnel<dim>::build_and_attach_right_side(Triangulation<dim>& tria) const
+{
+	Triangulation<2> aux;
+
+	const double width = left_length + center_length + right_length;
+	const double half_difference = 0.5*(std::fabs(left_height - right_height));
+	const double quarter_difference = 0.5*half_difference;
+
+	std::vector<double> x_divisions, y_divisions;
+
+	// split center length in half to fit simplex:
+	const double hcl = 0.5*center_length;
+
+	x_divisions.emplace_back(hcl); // includes middle portion
+	x_divisions.emplace_back(hcl); 
+
+	// x_divisions.emplace_back(right_length); // further divide this if right length is larger than half center
+	if(right_length > hcl)
+	{
+		const double n_x_divs = std::round(right_length/hcl);
+		const double dx = right_length/n_x_divs;
+
+		for(unsigned int i = 0; i < n_x_divs; ++i)
+			x_divisions.emplace_back(dx);
+	}
+	else
+	{
+		x_divisions.emplace_back(right_length); 
+	} /** @todo may want to futher divide if right is much less than half center */
+
+
+	// y_divisions.emplace_back(right_height);
+	if(right_height > quarter_difference)
+	{
+		const double n_divs = std::round(right_height/quarter_difference);
+		const double delta = right_height/n_divs;
+
+		for(unsigned int i = 0; i < n_divs; ++i)
+			y_divisions.emplace_back(delta);
+	}
+	else
+	{
+		y_divisions.emplace_back(right_height);
+	} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+	const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+                                            step_sizes,
+                                            Point<2>(left_length,
+                                            		half_difference), // bottom corner
+                                            Point<2>(width, half_difference + right_height));
+
+	// shift:
+	// already in correct spot
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+}
+
+template<int dim>
+void 
+Funnel<dim>::build_and_attach_upper_triangle(Triangulation<dim>& tria) const
+{
+	Triangulation<2> aux;
+
+	//The vertices argument contains a vector with all d+1 vertices of the simplex. 
+	// They must be given in an order such that the vectors from the first vertex to
+	// each of the others form a right-handed system. 
+
+	const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+	// go counter clockwise starting at rectangle corner
+	const Point<2> p1(left_length, half_difference + right_height);
+	const Point<2> p2(left_length + center_length, half_difference + right_height);
+	const Point<2> p3(left_length, left_height);
+
+	const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+	dealii::GridGenerator::simplex(aux, vertices);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+}
+
+template<int dim>
+void 
+Funnel<dim>::build_and_attach_lower_triangle(Triangulation<dim>& tria) const
+{
+	Triangulation<2> aux;
+
+	//The vertices argument contains a vector with all d+1 vertices of the simplex. 
+	// They must be given in an order such that the vectors from the first vertex to
+	// each of the others form a right-handed system. 
+	const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+	// go counter clockwise starting at rectangle corner
+	const Point<2> p1(left_length, half_difference);
+	const Point<2> p2(left_length, 0);
+	const Point<2> p3(left_length + center_length, half_difference);
+
+	const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+	dealii::GridGenerator::simplex(aux, vertices);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+}
+
+template<int dim>
+void 
+Funnel<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t FUNNEL:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Left length: " << left_length << std::endl
+		<< "Center length: " << center_length << std::endl
+		<< "Right length: " << right_length << std::endl
+		<< "Left height: " << left_height << std::endl
+		<< "Right height: " << right_height << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
+
+
+
+
+// -------------------------------------------------------------------------------
 // 		SPLITTER:
 // -------------------------------------------------------------------------------
 /** \brief Splitter class to construct splitter geometry and grid */
@@ -1569,6 +1940,8 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 		builder = std::make_shared<Splitter<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Cylinder") ) // 2d gives vortex
 		builder = std::make_shared<Cylinder<dim> >(prm);
+	else if( boost::iequals(geometry_type, "Funnel") )
+		builder = std::make_shared<Funnel<dim> >(prm);
 	// else if( boost::iequals(geometry_type, "File") )
 	// 	std::cout << "Need to implement" << std::endl;
 	else
@@ -1583,9 +1956,9 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Geometry");
 		prm.declare_entry("Geometry type",
 		          "Box",
-		          Patterns::Selection("Box|Filter|Mixer|Splitter|File"),
+		          Patterns::Selection("Box|Filter|Mixer|Splitter|Funnel|File"),
 		          "Geometry type. Options are Box, Filter, Mixer "
-		          "Splitter, of File. For File, name of file must also be"
+		          "Splitter, Funnel, or File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
 	prm.leave_subsection();
 
@@ -1595,6 +1968,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Mixer<dim>::declare_parameters(prm);
 	Splitter<dim>::declare_parameters(prm);
 	Cylinder<dim>::declare_parameters(prm);
+	Funnel<dim>::declare_parameters(prm);
 }
 
 // Main Methods:
@@ -1620,6 +1994,7 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	builder->set_edge_boundary_ids(geo, tria);
 	builder->set_sphere_boundary_ids(geo, tria); 
 	builder->set_rectangle_boundary_ids(geo, tria); 
+	builder->set_line_boundary_ids(geo, tria); 
 
 	// attach manifolds:
 	builder->attach_mesh_manifolds(geo, tria);

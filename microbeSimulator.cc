@@ -60,7 +60,8 @@ int main(int argc, char** argv)
 		if(cmd_prm.getDimension() == 2)
 		{
 			Simulation::Simulator<2> sim(cmd_prm);
-			sim.run();
+			// sim.run();
+			sim.test_mesh();
 			// sim.run_convergence_check();			
 				// FullSimulator<2> fsim(cmd_prm);
 				// fsim.run();
@@ -68,6 +69,17 @@ int main(int argc, char** argv)
 		else if(cmd_prm.getDimension() == 3)
 		{
 			std::cout << "Still need to implement some things" << std::endl;
+
+			double inf = std::numeric_limits<double>::infinity();
+			double finite = 1e10;
+
+			std::cout << "infinity is: " << inf << std::endl;
+			std::cout << "finite is: " << finite << std::endl;
+
+			std::cout << "first is inf? " << std::isinf(inf) << std::endl;
+			std::cout << "second is inf? " << std::isinf(finite) << std::endl;
+
+
 			// 	FullSimulator<3> sim(cmd_prm);
 			// 	sim.run();				
 		}

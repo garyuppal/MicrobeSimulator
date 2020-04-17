@@ -9,6 +9,8 @@ using dealii::Tensor;
 
 namespace MicrobeSimulator{
 
+// if we implement ``lines'' or hyper-plane in general, rectangle can also be constructed from these...
+
 /** \brief HyperRectangle class for interior rectangular obstacles */
 template<int dim>
 class HyperRectangle{
@@ -17,24 +19,34 @@ public:
     HyperRectangle(const Point<dim>& lower,
       const Point<dim>& upper);
 
+    HyperRectangle(const Point<dim>& lower,
+  				const Point<dim>& upper, 
+  				double theta);
+
     // accessors:
     Point<dim> getBottomLeft() const;
     Point<dim> getTopRight() const;
+    double getAngleXY() const;
 
     // mutators:
     void setBottomLeft(const Point<dim>& bl);
     void setTopRight(const Point<dim>& tr);
+    void setAngleXY(double theta);
 
-    double distance_from_border(const Point<dim>& p, double buffer=0) const;
+    double distance_from_border(const Point<dim>& p, double buffer=0) const; // add angle***
 
-    Tensor<1, dim> getNormalVector(const Point<dim>& p) const;
+    Tensor<1, dim> getNormalVector(const Point<dim>& p) const; // add angle***
 
     void reflectPoint(const Point<dim>& old_point,
                       Point<dim>& new_point,
-                      const double buffer = 0.) const;
+                      const double buffer = 0.) const; // add angle*** could just switch coordinates
 private:
     Point<dim> bottom_left;
     Point<dim> top_right;
+
+    double 		angle_xy; /**< Angle in X-Y plane measured from x axis */
+
+    Point<dim> rotate_point() const; // for using angle..., about origin??? or about bottom left point?
 
 }; // class HyperRectangle{}
 
@@ -45,6 +57,8 @@ private:
 /** \brief Default constructor */
 template<int dim>
 HyperRectangle<dim>::HyperRectangle()
+	:
+	angle_xy(0)
 {}
 
 /** \brief Constuctor given endpoints */
@@ -53,7 +67,19 @@ HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
 									const Point<dim>& upper)
 	:
 	bottom_left(lower),
-	top_right(upper)
+	top_right(upper),
+	angle_xy(0)
+{}
+
+/** \brief Constuctor given endpoints and angle */
+template<int dim>
+HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
+									const Point<dim>& upper,
+									double theta)
+	:
+	bottom_left(lower),
+	top_right(upper),
+	angle_xy(theta)
 {}
 
 // accessors:
@@ -74,7 +100,16 @@ HyperRectangle<dim>::getTopRight() const
 	return top_right;
 }
 
-// mutators:
+/** \brief Return x-y plane angle */
+template<int dim>
+double 
+HyperRectangle<dim>::getAngleXY() const
+{
+	return angle_xy;	
+}
+
+
+// mutators: (do we use these? need also to check validity... )
 
 /** \brief Set bottom left point of rectangle */
 template<int dim>
@@ -91,6 +126,16 @@ HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
 {
 	top_right = tr;
 }
+
+/** \brief Set XY plane angle */
+template<int dim>
+void
+HyperRectangle<dim>::setAngleXY(double theta)
+{
+	angle_xy = theta;
+}
+
+
 
 /** \brief Return distance to outer boundary of rectangle */
 template<int dim>

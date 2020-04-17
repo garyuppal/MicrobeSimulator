@@ -53,6 +53,7 @@ public:
 	// or create simulator interface and separate classes...
 	void run();
 	void run_convergence_check();
+	void test_mesh();
 private:
 	ParameterHandler prm;
 
@@ -145,6 +146,15 @@ Simulator<dim>::run()
 	setup_parameters();
 	setup_system();
 	run_microbes();
+}
+
+template<int dim>
+void
+Simulator<dim>::test_mesh()
+{
+	setup_parameters();
+	setup_geometry_grid();
+	setup_velocity();
 }
 
 /** \brief Initial microbe and chemical evolution without flow or mutation */
