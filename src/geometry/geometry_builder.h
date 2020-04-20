@@ -288,21 +288,16 @@ BuilderBase<dim>::set_line_boundary_ids(const Geometry<dim>& geo, Triangulation<
 			for(unsigned int i = 0; i < lines.size(); ++i)
 			{
 				const Point<dim> p = cell->face(f)->center();
-				const double distance_to_rectangle_border =
-					std::fabs(lines[i].distance_from_line(p));
 
-				// std::cout << "distance to border = " << distance_to_rectangle_border
-				// 	<< " for point at: " << p << " and line:";
-				// lines[i].printInfo(std::cout);
-
-				if ( distance_to_rectangle_border < edge_tolerance)
+				if ( std::fabs(lines[i].distance_from_line(p)) < edge_tolerance)
 					cell->face(f)->set_boundary_id(bid_line);
-			} // for rectangles
 
-			++bid_line;
-
+				++bid_line;
+				
+			} // for lines
 		} // for faces
 	} // for cells
+
 } // set line boundary ids
 
 /** \brief Attach manifolds to interior spheres */

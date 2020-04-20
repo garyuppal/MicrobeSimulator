@@ -54,6 +54,7 @@ public:
 	void run();
 	void run_convergence_check();
 	void test_mesh();
+	void test_random_walk_boundaries();
 private:
 	ParameterHandler prm;
 
@@ -430,6 +431,7 @@ Simulator<dim>::setup_geometry_grid()
 		GeometryTools::GeometryBuilder<dim> geo_bldr(prm);
 		geo_bldr.printInfo(std::cout);
 		geo_bldr.build_geometry(geometry);
+
 		geometry.printInfo(std::cout);
 		geometry.outputGeometry(output_directory);
 
@@ -740,6 +742,48 @@ Simulator<dim>::solve_chemicals()
 // {
 
 // }
+
+template<int dim>
+void 
+Simulator<dim>::test_random_walk_boundaries()
+{
+	setup_parameters();
+	setup_system();
+
+	std::cout << std::endl << std::endl
+		<< "Starting random walk only sim" << std::endl
+		<< Utility::long_line << std::endl
+		<< Utility::long_line << std::endl << std::endl;
+
+	// save period:
+	const unsigned int modsave
+		= static_cast<unsigned int>( std::ceil(save_period / bacteria_time_step) );
+	
+	Velocity::AdvectionHandler<dim>	const_velocity;
+	const_velocity.setup_constant(1.0);
+
+	do{
+		// update time:
+		time += bacteria_time_step;
+		++time_step_number;
+
+		// update bacteria:
+		bacteria.move(bacteria_time_step, geometry, const_velocity);
+
+		// output:
+		if(time_step_number % modsave == 0)
+		{
+			std::cout << "saving at time: " << time << std::endl;
+			output_bacteria();
+			++save_step_number;
+		}
+	}while( (time < run_time) && bacteria.isAlive() );
+}
+
+
+
+
+
 
 
 

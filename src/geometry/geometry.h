@@ -594,8 +594,8 @@ Geometry<dim>::outputGeometry(std::string output_directory) const
 	// lines:
 	std::ofstream lines_out(output_directory + "/lines.dat");
 	for(unsigned int i = 0; i < lines.size(); ++i)
-		lines[i].printInfo(lines_out);
-}
+		lines[i].print(lines_out); 
+} 
 
 
 // LEGACY:
