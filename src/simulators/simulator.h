@@ -238,6 +238,12 @@ Simulator<dim>::run_microbes()
 	const bool reintro = prm.get_bool("Bacteria","Reintroducing");
 	bool dont_kill = true;
 
+	int n_force_mutate = prm.get_int("Bacteria", "Deterministic number mutate");
+	bool force_mutated = false;
+	if( n_force_mutate < 1)
+		force_mutated = true; // don't check
+	double determinisitc_mutate_time = prm.get_double("Bacteria", "Deterministic mutate time");
+
 	do{
 		if(reintro)
 			reintro_bacteria();
@@ -271,6 +277,12 @@ Simulator<dim>::run_microbes()
 		else
 		{
 			chemicals.update(bacteria.getAllLocations(), bacteria.getAllRates());
+		}
+
+		if(!force_mutated && (time > determinisitc_mutate_time) )
+		{
+			bacteria.force_mutate(n_force_mutate);
+			force_mutated = true;
 		}
 
 		if(time_step_number % bacteria_time_step_multiplier == 0)

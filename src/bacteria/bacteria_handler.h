@@ -81,6 +81,7 @@ public:
 	void move(double dt, const Geometry<dim>& geometry, 
 		const Velocity::AdvectionHandler<dim>& velocity); 
 
+	void force_mutate(int n_mutate);
 	void mutate(double dt);
 
 	// legacy: (remove)
@@ -258,6 +259,26 @@ BacteriaHandler<dim>::move(double dt, const Geometry<dim>& geometry,
 		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0] - right_open_buffer,
 											pg_rates);	
 
+}
+
+template<int dim>
+void
+BacteriaHandler<dim>::force_mutate(int n_mutate)
+{
+	unsigned int mutated = 0;
+	unsigned int n_bact = bacteria.size();
+	n_mutate = (n_mutate < n_bact)? n_mutate : n_bact;
+
+	auto it = bacteria.begin();
+	do{
+		double current_sec = (*it)->getSecretionRate(0);
+		if( current_sec > 0)
+		{
+			(*it)->setSecretionRate(0, 0.);
+			++mutated;
+		}
+		++it;
+	}while( (mutated < n_mutate) && (it !=bacteria.end() ) );
 }
 
 template<int dim>

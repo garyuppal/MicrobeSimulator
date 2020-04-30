@@ -1,5 +1,5 @@
 #include "src/utility/command_line_parser.h"
-#include "src/simulators/full_simulator.h"
+// #include "src/simulators/full_simulator.h"
 
 #include "src/simulators/simulator.h"
 
