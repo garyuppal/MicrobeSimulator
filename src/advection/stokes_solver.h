@@ -373,10 +373,10 @@ StokesSolver<dim>::StokesSolver(Triangulation<dim>& tria,
 	stokes_dof_handler(*triangulation),
 	active(false)
 {
-	std::cout << "checking no slip boundaries..." << std::endl;
-	for(unsigned int i = 0; i < no_slip_boundaries.size(); ++i)
-		std::cout << "no slip id: " << no_slip_boundaries[i] << std::endl;
-	std::cout << ".........................................." << std::endl;
+	// std::cout << "checking no slip boundaries..." << std::endl;
+	// for(unsigned int i = 0; i < no_slip_boundaries.size(); ++i)
+	// 	std::cout << "no slip id: " << no_slip_boundaries[i] << std::endl;
+	// std::cout << ".........................................." << std::endl;
 	
 	solve(inlet_vel, output_directory, true);
 }
