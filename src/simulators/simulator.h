@@ -760,7 +760,7 @@ Simulator<dim>::test_random_walk_boundaries()
 		= static_cast<unsigned int>( std::ceil(save_period / bacteria_time_step) );
 	
 	Velocity::AdvectionHandler<dim>	const_velocity;
-	const_velocity.setup_constant(1.0);
+	const_velocity.setup_constant(0.0);
 
 	do{
 		// update time:

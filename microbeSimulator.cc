@@ -18,6 +18,9 @@
 // - static assertions    Assert(false, ExcNotImplemented());
 // - filter continuous mutation...
 
+// - can already test random walk for cylinder geometry,
+// just need to implement grid update and check flow
+
 // - need to make sure bacteria time step does not cross channel ***or modify geometry class to better handle channel walls
 
 // - add circle geometries for vortex and cylindrical pipe...
@@ -61,6 +64,7 @@ int main(int argc, char** argv)
 		{
 			Simulation::Simulator<2> sim(cmd_prm);
 			sim.run();
+			// sim.test_mesh();
 		}
 		else if(cmd_prm.getDimension() == 3)
 		{
