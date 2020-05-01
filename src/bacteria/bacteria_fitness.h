@@ -257,6 +257,8 @@ private:
 	double harm_saturation;
 
 	double secretion_cost;
+
+	double constant;
 };
 
 // IMPL
@@ -276,6 +278,7 @@ OR_Fitness<dim>::OR_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch,
 	benefit_saturation = prm.get_double(subsection, "Benefit saturation");
 	harm_saturation = prm.get_double(subsection, "Harm saturation");
 	secretion_cost = prm.get_double(subsection, "Secretion cost");	
+	constant = prm.get_double(subsection, "Constant");	
 }
 
 /** \brief Declare OR fitness type parameters */
@@ -290,6 +293,7 @@ OR_Fitness<dim>::declare_parameters(ParameterHandler& prm)
 			prm.declare_entry("Benefit saturation","0",Patterns::Double());
 			prm.declare_entry("Harm saturation","0",Patterns::Double());
 			prm.declare_entry("Secretion cost","0",Patterns::Double());
+			prm.declare_entry("Constant", "0", Patterns::Double());
 		prm.leave_subsection();
 	prm.leave_subsection();
 }
@@ -316,7 +320,8 @@ OR_Fitness<dim>::value(const Point<dim>& location,
 
 	return benefit*total_goods / ( total_goods + benefit_saturation )
 		- harm*waste / ( waste + harm_saturation )
-		- secretion_cost * total_secretion_rate; 
+		- secretion_cost * total_secretion_rate
+		+ constant; 
 }
 
 /** \brief Display OR type fitness info */
@@ -333,7 +338,8 @@ OR_Fitness<dim>::printInfo(std::ostream& out) const
 	    << "\t waste harm: " << harm << std::endl
 	    << "\t public good saturation: " << benefit_saturation << std::endl
 	    << "\t waste saturation: " << harm_saturation << std::endl
-	    << "\t secretion cost: " << secretion_cost << std::endl;
+	    << "\t secretion cost: " << secretion_cost << std::endl
+	    << "\t constant: " << constant << std::endl;
 	out << Utility::medium_line
 		<< std::endl << std::endl << std::endl;
 }
@@ -363,6 +369,8 @@ private:
 	double harm_saturation;
 
 	double secretion_cost;
+
+	double constant;
 };
 
 // IMPL
@@ -382,6 +390,7 @@ AND_Fitness<dim>::AND_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& c
 	benefit_saturation = prm.get_double(subsection, "Benefit saturation");
 	harm_saturation = prm.get_double(subsection, "Harm saturation");
 	secretion_cost = prm.get_double(subsection, "Secretion cost");	
+	constant = prm.get_double(subsection, "Constant");	
 }
 
 /** \brief Declare AND fitness type parameters */
@@ -396,6 +405,7 @@ AND_Fitness<dim>::declare_parameters(ParameterHandler& prm)
 			prm.declare_entry("Benefit saturation","0",Patterns::Double());
 			prm.declare_entry("Harm saturation","0",Patterns::Double());
 			prm.declare_entry("Secretion cost","0",Patterns::Double());
+			prm.declare_entry("Constant","0",Patterns::Double());
 		prm.leave_subsection();
 	prm.leave_subsection();
 }
@@ -421,7 +431,8 @@ AND_Fitness<dim>::value(const Point<dim>& location,
 
 	return benefit*total_goods / ( total_goods + benefit_saturation )
 		- harm*waste / ( waste + harm_saturation )
-		- secretion_cost * total_secretion_rate; 
+		- secretion_cost * total_secretion_rate
+		+ constant; 
 }
 
 /** \brief Display AND type fitness info */
@@ -438,7 +449,8 @@ AND_Fitness<dim>::printInfo(std::ostream& out) const
 	    << "\t waste harm: " << harm << std::endl
 	    << "\t public good saturation: " << benefit_saturation << std::endl
 	    << "\t waste saturation: " << harm_saturation << std::endl
-	    << "\t secretion cost: " << secretion_cost << std::endl;
+	    << "\t secretion cost: " << secretion_cost << std::endl
+	    << "\t constant: " << constant << std::endl;
 	out << Utility::medium_line
 		<< std::endl << std::endl << std::endl;
 }
