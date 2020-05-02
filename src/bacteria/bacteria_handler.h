@@ -81,7 +81,7 @@ public:
 	void move(double dt, const Geometry<dim>& geometry, 
 		const Velocity::AdvectionHandler<dim>& velocity); 
 
-	void force_mutate(int n_mutate);
+	void force_mutate(int n_mutate, double ds);
 	void mutate(double dt);
 
 	// legacy: (remove)
@@ -163,6 +163,7 @@ BacteriaHandler<dim>::declare_parameters(ParameterHandler& prm)
 		prm.declare_entry("Initial number cheaters","0",Patterns::Unsigned());
 		prm.declare_entry("Deterministic number mutate","0",Patterns::Unsigned());
 		prm.declare_entry("Deterministic mutate time","0",Patterns::Double());
+		prm.declare_entry("Deterministic mutation strength","10000",Patterns::Double());
 		prm.declare_entry("Initial locations",
 							"{{}}",
 							Patterns::List(Patterns::List(Patterns::Double())));
@@ -263,7 +264,7 @@ BacteriaHandler<dim>::move(double dt, const Geometry<dim>& geometry,
 
 template<int dim>
 void
-BacteriaHandler<dim>::force_mutate(int n_mutate)
+BacteriaHandler<dim>::force_mutate(int n_mutate, double ds)
 {
 	unsigned int mutated = 0;
 	unsigned int n_bact = bacteria.size();
@@ -274,7 +275,9 @@ BacteriaHandler<dim>::force_mutate(int n_mutate)
 		double current_sec = (*it)->getSecretionRate(0);
 		if( current_sec > 0)
 		{
-			(*it)->setSecretionRate(0, 0.);
+			double set_sec = current_sec -  ds;
+			set_sec = (set_sec < 0)? 0. : set_sec; 
+			(*it)->setSecretionRate(0, set_sec);
 			++mutated;
 		}
 		++it;

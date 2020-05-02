@@ -243,7 +243,7 @@ Simulator<dim>::run_microbes()
 	if( n_force_mutate < 1)
 		force_mutated = true; // don't check
 	double determinisitc_mutate_time = prm.get_double("Bacteria", "Deterministic mutate time");
-
+	double ds = prm.get_double("Bacteria", "Deterministic mutation strength");
 	do{
 		if(reintro)
 			reintro_bacteria();
@@ -281,7 +281,7 @@ Simulator<dim>::run_microbes()
 
 		if(!force_mutated && (time > determinisitc_mutate_time) )
 		{
-			bacteria.force_mutate(n_force_mutate);
+			bacteria.force_mutate(n_force_mutate, ds);
 			force_mutated = true;
 		}
 
