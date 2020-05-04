@@ -24,6 +24,11 @@ public:
 	Line(const Point<2>& lft, const Point<2>& rgt);
 	Line(const Point<2>& lft, const Point<2>& rgt, Orientation ori);
 
+	// accessors:
+	Point<2> getLeftPoint() const;
+	Point<2> getRightPoint() const;
+	Orientation getOrientation() const;
+
 	// methods: (should maybe override virtual methods)
 	double distance_from_line(const Point<2>& p) const; 
 	// signed distance, return infinity if not orthogonal to line segment
@@ -158,6 +163,25 @@ Line::init()
 		if(orientation == ABOVE)
 			normal = -normal;
 	}
+}
+
+// accessors:
+Point<2> 
+Line::getLeftPoint() const
+{
+	return left;
+}
+
+Point<2> 
+Line::getRightPoint() const
+{
+	return right;
+}
+
+Line::Orientation 
+Line::getOrientation() const
+{
+	return orientation;
 }
 
 // helper methods:

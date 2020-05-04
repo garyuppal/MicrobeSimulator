@@ -2216,7 +2216,13 @@ public:
 	void build_grid(const Geometry<dim>& geo, Triangulation<dim>& tria) const; 
 	void printInfo(std::ostream& out) const;
 private:
+	bool tileable;
+	unsigned int n_tiles;
+
 	std::shared_ptr<BuilderBase<dim> >		builder;
+
+	void tile_geometry(Geometry<dim>& geo) const;
+	void tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const;
 };
 
 // IMPL
@@ -2224,6 +2230,9 @@ private:
 /** \brief Constuctor: Construct appropriate building class */
 template<int dim>
 GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
+	:
+	tileable(true),
+	n_tiles(1)
 {
 	const std::string section = "Geometry";
 	std::string geometry_type = prm.get_string(section, "Geometry type");
@@ -2239,13 +2248,18 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	else if( boost::iequals(geometry_type, "Cylinder") ) // 2d gives vortex
 		builder = std::make_shared<Cylinder<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Funnel") )
+	{
 		builder = std::make_shared<Funnel<dim> >(prm);
+		tileable = false;
+	}
 	else if( boost::iequals(geometry_type, "BowTie") )
 		builder = std::make_shared<BowTie<dim> >(prm);
 	// else if( boost::iequals(geometry_type, "File") )
 	// 	std::cout << "Need to implement" << std::endl;
 	else
 		throw std::runtime_error("Invalid geometry type: <" + geometry_type + ">");
+
+	n_tiles = prm.get_unsigned(section, "Number tiles");
 }
 
 /** \brief Declare all parameters for all builder classes */
@@ -2260,6 +2274,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 		          "Geometry type. Options are Box, Filter, Mixer "
 		          "Splitter, Funnel, BowTie, or File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
+		prm.declare_entry("Number tiles", "1", Patterns::Unsigned());
 	prm.leave_subsection();
 
 	GridGenerationTools::declare_parameters(prm); 
@@ -2278,6 +2293,10 @@ void
 GeometryBuilder<dim>::build_geometry(Geometry<dim>& geo) const
 {
 	builder->build_geometry(geo);
+
+	// tile
+	if(tileable && (n_tiles > 1))
+		tile_geometry(geo);
 }
 
 /** \brief Build grid */
@@ -2289,6 +2308,10 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 
 	// build grid:
 	builder->build_grid_base(geo, tria);
+
+	// tile
+	if(tileable && (n_tiles > 1))
+		tile_mesh(geo, tria);
 
 	// set boundary labels:
 	builder->set_edge_boundary_ids(geo, tria);
@@ -2304,6 +2327,98 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	builder->refine_obstacles(geo, tria);
 	builder->refine_boundary(geo, tria);
 	builder->refine_largest_cells(tria);
+}
+
+template<int dim>
+void 
+GeometryBuilder<dim>::tile_geometry(Geometry<dim>& geo) const
+{
+	const double width = geo.getWidth(0);
+
+	// enlarge x bound:
+	Point<dim> tr = geo.getTopRightPoint();
+	tr[0] = tr[0] + (n_tiles-1)*width;
+	geo.setTopRightPoint(tr);
+
+	// shift and duplicate all rectangles, spheres, and lines
+
+	// rectangles:
+	std::vector<HyperRectangle<dim> > rects = geo.getRectangles();
+	for(unsigned int i = 0; i < rects.size(); ++i)
+	{
+		for(unsigned int tile = 1; tile < n_tiles; ++tile)
+		{
+			Point<dim> r_bl = rects[i].getBottomLeft();
+			Point<dim> r_tr = rects[i].getTopRight();
+
+			// shift:
+			r_bl[0] = r_bl[0] + tile*width;
+			r_tr[0] = r_tr[0] + tile*width;
+
+			// add:
+			geo.addRectangle(HyperRectangle<dim>(r_bl,r_tr));
+		} // for each tile
+	} // for each rectangle
+
+	// spheres:
+	std::vector<Sphere<dim> > spheres = geo.getSpheres();
+	for(unsigned int i = 0; i < spheres.size(); ++i)
+	{
+		for(unsigned int tile = 1; tile < n_tiles; ++tile)
+		{
+			const double radius = spheres[i].getRadius();
+			Point<dim> center = spheres[i].getCenter();
+
+			// shift:
+			center[0] = center[0] + tile*width;
+
+			// add:
+			geo.addSphere(Sphere<dim>(center, radius));
+		}
+	}
+
+	// lines: (for 2d only)
+	std::vector<Line> lines = geo.getLines();
+	for(unsigned int i = 0; i < lines.size(); ++i)
+	{
+		for(unsigned int tile = 1; tile < n_tiles; ++tile)
+		{
+			// get info:
+			Point<2> left = lines[i].getLeftPoint();
+			Point<2> right = lines[i].getRightPoint();
+			Line::Orientation ori = lines[i].getOrientation();
+
+			// shift:
+			left[0] = left[0] + tile*width;
+			right[0] = right[0] + tile*width;
+
+			geo.addLine(Line(left,right,ori));
+		}
+	}
+}
+
+template<int dim>
+void 
+GeometryBuilder<dim>::tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+{
+	Triangulation<dim> aux;
+	aux.copy_triangulation(tria);
+
+	Tensor<1, dim> shift_vector;
+	shift_vector[0] = geo.getWidth(0)/((double)n_tiles); // get width along x direction of base geometry
+
+	for(unsigned int dim_itr = 1; dim_itr < dim; ++dim_itr)
+		shift_vector[dim_itr] = 0.;
+
+	// for number of tiles:
+	for(unsigned int i = 1; i < n_tiles; ++i)
+	{
+		// shift base copy triangulation:
+	    dealii::GridTools::shift(shift_vector, aux);
+
+		// merge shifted copy:
+		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+	}
 }
 
 /** \brief Display builder (geometry type) info */

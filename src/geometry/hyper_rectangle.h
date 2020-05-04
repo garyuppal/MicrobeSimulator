@@ -19,19 +19,19 @@ public:
     HyperRectangle(const Point<dim>& lower,
       const Point<dim>& upper);
 
-    HyperRectangle(const Point<dim>& lower,
-  				const Point<dim>& upper, 
-  				double theta);
+    // HyperRectangle(const Point<dim>& lower,
+  		// 		const Point<dim>& upper, 
+  		// 		double theta);
 
     // accessors:
     Point<dim> getBottomLeft() const;
     Point<dim> getTopRight() const;
-    double getAngleXY() const;
+    // double getAngleXY() const;
 
     // mutators:
     void setBottomLeft(const Point<dim>& bl);
     void setTopRight(const Point<dim>& tr);
-    void setAngleXY(double theta);
+    // void setAngleXY(double theta);
 
     double distance_from_border(const Point<dim>& p, double buffer=0) const; // add angle***
 
@@ -44,9 +44,9 @@ private:
     Point<dim> bottom_left;
     Point<dim> top_right;
 
-    double 		angle_xy; /**< Angle in X-Y plane measured from x axis */
+    // double 		angle_xy; *< Angle in X-Y plane measured from x axis 
 
-    Point<dim> rotate_point() const; // for using angle..., about origin??? or about bottom left point?
+    // Point<dim> rotate_point() const; // for using angle..., about origin??? or about bottom left point?
 
 }; // class HyperRectangle{}
 
@@ -57,8 +57,8 @@ private:
 /** \brief Default constructor */
 template<int dim>
 HyperRectangle<dim>::HyperRectangle()
-	:
-	angle_xy(0)
+	// :
+	// angle_xy(0)
 {}
 
 /** \brief Constuctor given endpoints */
@@ -67,20 +67,20 @@ HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
 									const Point<dim>& upper)
 	:
 	bottom_left(lower),
-	top_right(upper),
-	angle_xy(0)
+	top_right(upper)
+	// angle_xy(0)
 {}
 
-/** \brief Constuctor given endpoints and angle */
-template<int dim>
-HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
-									const Point<dim>& upper,
-									double theta)
-	:
-	bottom_left(lower),
-	top_right(upper),
-	angle_xy(theta)
-{}
+// /** \brief Constuctor given endpoints and angle */
+// template<int dim>
+// HyperRectangle<dim>::HyperRectangle(const Point<dim>& lower,
+// 									const Point<dim>& upper,
+// 									double theta)
+// 	:
+// 	bottom_left(lower),
+// 	top_right(upper),
+// 	angle_xy(theta)
+// {}
 
 // accessors:
 
@@ -100,13 +100,13 @@ HyperRectangle<dim>::getTopRight() const
 	return top_right;
 }
 
-/** \brief Return x-y plane angle */
-template<int dim>
-double 
-HyperRectangle<dim>::getAngleXY() const
-{
-	return angle_xy;	
-}
+// /** \brief Return x-y plane angle */
+// template<int dim>
+// double 
+// HyperRectangle<dim>::getAngleXY() const
+// {
+// 	return angle_xy;	
+// }
 
 
 // mutators: (do we use these? need also to check validity... )
@@ -127,13 +127,13 @@ HyperRectangle<dim>::setTopRight(const Point<dim>& tr)
 	top_right = tr;
 }
 
-/** \brief Set XY plane angle */
-template<int dim>
-void
-HyperRectangle<dim>::setAngleXY(double theta)
-{
-	angle_xy = theta;
-}
+// /** \brief Set XY plane angle */
+// template<int dim>
+// void
+// HyperRectangle<dim>::setAngleXY(double theta)
+// {
+// 	angle_xy = theta;
+// }
 
 
 
