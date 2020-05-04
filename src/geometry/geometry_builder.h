@@ -934,6 +934,153 @@ Filter<dim>::printInfo(std::ostream& out) const
 
 
 // -------------------------------------------------------------------------------
+// 		CHANNEL MIXER:
+// -------------------------------------------------------------------------------
+
+/** \brief Channel mixer geometry builder */
+template<int dim>
+class ChannelMixer : public BuilderBase<dim>{
+public:
+	// constructor
+	ChannelMixer(const ParameterHandler& prm);
+
+	// class parameters:
+	static void declare_parameters(ParameterHandler& prm);
+
+	// override virtual methods:
+	void build_geometry(Geometry<dim>& geo) const override; 
+	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+	void printInfo(std::ostream& out) const override;
+
+private:
+	unsigned int number_channels;
+	double height;
+	double wall_thickness;
+	double left;
+	double right;
+	double grow_length;
+	double split_length;
+	double mix_length;
+
+	unsigned int n_mix;
+
+	// aux:
+	double channel_thickness;
+	double half_channel;
+
+	void assign_aux_parameters();
+
+	// helper methods:
+
+
+	// extrusion to 3D:
+	// void extrude(Triangulation<dim>& filter_twodim);
+};
+
+// IMPL
+// -----------------------------------------------------------------
+
+/** \brief Parameter declaration for channel mixer class */
+template<int dim>
+void 
+ChannelMixer<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Channel Mixer");
+			// heights
+			prm.declare_entry("Height","1",Patterns::Double());
+			prm.declare_entry("Number channels","1",Patterns::Unsigned());
+			prm.declare_entry("Wall thickness","1",Patterns::Double());
+
+			// lengths:
+			prm.declare_entry("Left","1",Patterns::Double());
+			prm.declare_entry("Grow length","1",Patterns::Double());
+			prm.declare_entry("Split length","1",Patterns::Double());
+			prm.declare_entry("Mix length","1",Patterns::Double());
+			prm.declare_entry("Right","1",Patterns::Double());
+
+			// n reps:
+			prm.declare_entry("Number mixings","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+} // maybe separate declarations for 2 and 3 (option to extrude)
+
+
+/** \brief Constructor for filter class */
+template<int dim>
+ChannelMixer<dim>::ChannelMixer(const ParameterHandler& prm)
+	:
+	BuilderBase<dim>(prm)
+{
+	const std::string subsection = "Geometry.Channel Mixer";
+
+	number_channels = prm.get_unsigned(subsection, "Number channels");
+
+	if(number_channels == 0)
+		throw std::runtime_error("Channel mixer geometry needs at least one channel");
+
+    height = prm.get_double(subsection, "Height");
+	wall_thickness = prm.get_double(subsection, "Wall thickness");
+
+	// lengths:
+	left = prm.get_double(subsection, "Left");
+	right = prm.get_double(subsection, "Right");
+	grow_length = prm.get_double(subsection, "Grow length");
+	split_length = prm.get_double(subsection, "Split length");
+	mix_length = prm.get_double(subsection, "Mix length");
+
+	n_mix = prm.get_double(subsection, "Number mixings");
+
+	assign_aux_parameters();
+}
+
+template<int dim>
+void
+ChannelMixer<dim>::assign_aux_parameters()
+{
+	channel_thickness = (height - (number_channels-1.0)*wall_thickness)/((double)number_channels);
+
+	half_channel = 0.5*channel_thickness;
+}
+
+// override virtual methods:
+template<int dim>
+void 
+ChannelMixer<dim>::build_geometry(Geometry<dim>& geo) const
+{
+	throw std::runtime_error("not yet implemented");
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+{
+	throw std::runtime_error("not yet implemented");
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Channel Mixer:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Number channels: " << number_channels << std::endl
+		<< "Height: " << height << std::endl
+		<< "Wall thickness: " << wall_thickness << std::endl
+		<< "Channel thickness: " << channel_thickness << std::endl
+		<< "Left length: " << left << std::endl
+		<< "Right length: " << right << std::endl
+		<< "Grow length: " << grow_length << std::endl
+		<< "Split length: " << split_length << std::endl
+		<< "Mix length: " << mix_length << std::endl
+		<< "Number mixings: " << n_mix << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
+
+
+// -------------------------------------------------------------------------------
 // 		MIXER:
 // -------------------------------------------------------------------------------
 /** \brief Class to construct Mixer type geometry */
@@ -2254,6 +2401,8 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	}
 	else if( boost::iequals(geometry_type, "BowTie") )
 		builder = std::make_shared<BowTie<dim> >(prm);
+	else if( boost::iequals(geometry_type, "Channel Mixer") )
+		builder = std::make_shared<ChannelMixer<dim> >(prm);
 	// else if( boost::iequals(geometry_type, "File") )
 	// 	std::cout << "Need to implement" << std::endl;
 	else
@@ -2270,7 +2419,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Geometry");
 		prm.declare_entry("Geometry type",
 		          "Box",
-		          Patterns::Selection("Box|Filter|Mixer|Splitter|Funnel|BowTie|File"),
+		          Patterns::Selection("Box|Filter|Mixer|Splitter|Funnel|BowTie|Channel Mixer|File"),
 		          "Geometry type. Options are Box, Filter, Mixer "
 		          "Splitter, Funnel, BowTie, or File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
@@ -2284,6 +2433,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Splitter<dim>::declare_parameters(prm);
 	Cylinder<dim>::declare_parameters(prm);
 	Funnel<dim>::declare_parameters(prm); // also for bowtie
+	ChannelMixer<dim>::declare_parameters(prm);
 }
 
 // Main Methods:
