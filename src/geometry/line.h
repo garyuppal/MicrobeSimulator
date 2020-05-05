@@ -287,7 +287,7 @@ Line::is_in_bounds(const Point<2>& p, const double buffer) const
 // /** \brief Return unit vector normal to line in direction of given point,
 // *  with sign given from orientation */
 Tensor<1, 2> 
-Line::getNormalVector(const Point<2>& p) const
+Line::getNormalVector(const Point<2>& /*p*/) const
 {
 	return normal;
 }
@@ -378,7 +378,7 @@ Line::getNormalVector(const Point<2>& p) const
 
 /** \brief Reflect point from line */
 void 
-Line::reflectPoint(const Point<2>& old_point, 
+Line::reflectPoint(const Point<2>& /* old_point */, 
 			Point<2>& new_point, const double buffer) const
 {
 	// assuming already checked that old point and new point 

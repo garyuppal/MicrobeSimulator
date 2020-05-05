@@ -971,9 +971,22 @@ private:
 	void assign_aux_parameters();
 
 	// helper methods:
+	//geometry:
 	void addChannelRectangles(Geometry<dim>& geo, double offset, double width) const;
 	void addMixingRectangles(Geometry<dim>& geo, double offset) const;
 	
+	// meshing:
+	void build_left_side(Triangulation<dim>& tria) const;
+	void addChannelRectangles(Triangulation<dim>& tria, double offset) const;
+	void addMixingRectangles(Triangulation<dim>& tria, double offset) const;
+	void addSplittingRectangles(Triangulation<dim>& tria, double offset) const;
+	void build_attach_right_side(Triangulation<dim>& tria, double offset) const;
+
+	void addRectangle(Triangulation<dim>& tria,
+	const std::vector< std::vector< double > > &  step_sizes,
+	const Point<dim>& lower, 
+	const Point<dim>& upper) const;
+
 	// extrusion to 3D:
 	// void extrude(Triangulation<dim>& filter_twodim);
 };
@@ -1033,6 +1046,9 @@ ChannelMixer<dim>::ChannelMixer(const ParameterHandler& prm)
 	n_mix = prm.get_double(subsection, "Number mixings");
 
 	assign_aux_parameters();
+
+	if( (half_channel - 0.5*wall_thickness) < 0)
+		throw std::runtime_error("Height to small for given number channels and wall thickness.");
 }
 
 template<int dim>
@@ -1119,7 +1135,7 @@ ChannelMixer<dim>::addMixingRectangles(Geometry<dim>& geo, double offset) const
 	lower[0] = offset + grow_length;
 	upper[0] = lower[0] + width;
 
-	lower[1] = half_channel;
+	lower[1] = half_channel - 0.5*wall_thickness;
 	for(unsigned int i = 0; i < number_channels; ++i)
 	{
 		upper[1] = lower[1] + wall_thickness;
@@ -1130,9 +1146,209 @@ ChannelMixer<dim>::addMixingRectangles(Geometry<dim>& geo, double offset) const
 
 template<int dim>
 void 
-ChannelMixer<dim>::build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+ChannelMixer<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation<dim>& tria) const
 {
-	throw std::runtime_error("not yet implemented");
+	build_left_side(tria);
+
+	const double rep_width = grow_length + split_length + mix_length + split_length;
+	double offset_grow = left;
+	
+	addChannelRectangles(tria, offset_grow);
+
+	for(unsigned int i = 0; i < n_mix; ++i)
+	{
+		addSplittingRectangles(tria, offset_grow + grow_length);
+		addMixingRectangles(tria, offset_grow + grow_length + split_length); 
+		addSplittingRectangles(tria, offset_grow + grow_length + split_length + mix_length);
+
+		offset_grow += rep_width;
+		addChannelRectangles(tria, offset_grow);
+	}
+
+	// for(unsigned int i = 0; i < n_mix-1; ++i)
+	// {
+	// 	offset_mix += offset_mix_width;
+	// 	if(i==0)
+	// 		offset_grow += grow_length + split_length + mix_length;
+	// 	else
+	// 		offset_grow += offset_mix_width;
+
+	// 	addChannelRectangles(tria, offset_grow);
+	// 	addSplittingRectangles(tria, offset_mix);
+	// 	addMixingRectangles(tria, offset_mix + split_length); 
+	// 	addSplittingRectangles(tria, offset_mix + mix_length + split_length);
+	// }	
+	// if(n_mix < 2)
+	// 	offset_grow += grow_length + split_length + mix_length;
+	// else
+	// 	offset_grow += offset_mix_width;
+
+	// addChannelRectangles(tria, offset_grow);
+
+	build_attach_right_side(tria, offset_grow + grow_length);
+}
+
+
+// meshing:
+template<int dim>
+void 
+ChannelMixer<dim>::build_left_side(Triangulation<dim>& tria) const
+{
+	std::vector<double> x_divisions = {left};
+
+	std::vector<double> y_divisions; // split 
+
+	for(unsigned int i = 0; i < number_channels; ++i)
+	{
+		y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+		y_divisions.emplace_back(wall_thickness);
+		y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+		y_divisions.emplace_back(wall_thickness);
+	}
+	y_divisions.pop_back();
+
+	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(tria,
+													step_sizes,
+													Point<2>(0,0),
+													Point<2>(left, height));
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::addChannelRectangles(Triangulation<dim>& tria, double offset) const
+{
+	std::vector<double> x_divisions = {grow_length};
+
+	std::vector<double> y_divisions; // split 
+	y_divisions.reserve(3);
+	y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+	y_divisions.emplace_back(wall_thickness);
+	y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+	
+	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+	Point<dim> lower, upper;
+
+	// x limits:
+	lower[0] = offset;
+	upper[0] = lower[0] + grow_length;
+
+	lower[1] = 0.;
+	for(unsigned int i = 0; i < number_channels; ++i)
+	{
+		upper[1] = lower[1] + channel_thickness;
+		addRectangle(tria, step_sizes, lower, upper);
+
+		lower[1] = lower[1] + channel_thickness + wall_thickness;
+	}
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::addMixingRectangles(Triangulation<dim>& tria, double offset) const
+{
+	// first:
+	std::vector<double> x_divisions = {mix_length};
+	std::vector<double> outer_y_divisions = {half_channel - 0.5*wall_thickness};
+	
+	std::vector< std::vector< double > >  outer_step_sizes = {x_divisions, outer_y_divisions};
+	Point<dim> lower, upper;
+
+	// x limits:
+	lower[0] = offset;
+	upper[0] = offset + mix_length;
+
+	lower[1] = 0.;
+	upper[1] = lower[1] + half_channel - 0.5*wall_thickness;
+	addRectangle(tria, outer_step_sizes, lower, upper);
+
+	// middle ones:
+	std::vector<double> y_divisions;
+	y_divisions.reserve(3);
+	y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+	y_divisions.emplace_back(wall_thickness);
+	y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+	
+	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+	
+	lower[1] = half_channel + 0.5*wall_thickness;
+	for(unsigned int i = 0; i < number_channels-1; ++i)
+	{
+		upper[1] = lower[1] + channel_thickness;
+		addRectangle(tria, step_sizes, lower, upper);
+		lower[1] = lower[1] + channel_thickness + wall_thickness;
+	}
+
+	// last:
+	upper[1] = lower[1] + channel_thickness;
+	addRectangle(tria, outer_step_sizes, lower, upper);
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::addSplittingRectangles(Triangulation<dim>& tria, double offset) const
+{
+	std::vector<double> x_divisions = {split_length};
+	std::vector<double> y_divisions = {half_channel - 0.5*wall_thickness};
+	
+	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+	Point<dim> lower, upper;
+
+	// x limits:
+	lower[0] = offset;
+	upper[0] = lower[0] + split_length;
+
+	const unsigned int n_split = 2*number_channels;
+
+	lower[1] = 0.;
+	for(unsigned int i = 0; i < n_split; ++i)
+	{
+		upper[1] = lower[1] + half_channel - 0.5*wall_thickness;
+		addRectangle(tria, step_sizes, lower, upper);
+
+		lower[1] = lower[1] + half_channel + 0.5*wall_thickness;
+	}
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::build_attach_right_side(Triangulation<dim>& tria, double offset) const
+{
+	std::vector<double> x_divisions = {right};
+
+	std::vector<double> y_divisions; // split 
+
+	for(unsigned int i = 0; i < number_channels; ++i)
+	{
+		y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+		y_divisions.emplace_back(wall_thickness);
+		y_divisions.emplace_back(half_channel - 0.5*wall_thickness);
+		y_divisions.emplace_back(wall_thickness);
+	}
+	y_divisions.pop_back();
+
+	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+	addRectangle(tria, step_sizes, Point<2>(offset,0), Point<2>(offset + right, height));
+}
+
+template<int dim>
+void 
+ChannelMixer<dim>::addRectangle(Triangulation<dim>& tria, 
+	const std::vector< std::vector< double > > &  step_sizes,
+	const Point<dim>& lower, 
+	const Point<dim>& upper) const
+{
+	Triangulation<2> aux;
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+												step_sizes,
+												lower,
+												upper);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
 }
 
 template<int dim>
