@@ -971,8 +971,9 @@ private:
 	void assign_aux_parameters();
 
 	// helper methods:
-
-
+	void addChannelRectangles(Geometry<dim>& geo, double offset, double width) const;
+	void addMixingRectangles(Geometry<dim>& geo, double offset) const;
+	
 	// extrusion to 3D:
 	// void extrude(Triangulation<dim>& filter_twodim);
 };
@@ -1048,7 +1049,83 @@ template<int dim>
 void 
 ChannelMixer<dim>::build_geometry(Geometry<dim>& geo) const
 {
-	throw std::runtime_error("not yet implemented");
+	const double offset_mix_width = grow_length + split_length + mix_length + split_length;
+	double offset_grow = left;
+	double offset_mix = offset_grow;
+	
+	addChannelRectangles(geo, offset_grow, grow_length + split_length);
+	addMixingRectangles(geo, offset_mix); 
+	for(unsigned int i = 0; i < n_mix-1; ++i)
+	{
+		offset_mix += offset_mix_width;
+		if(i==0)
+			offset_grow += grow_length + split_length + mix_length;
+		else
+			offset_grow += offset_mix_width;
+
+		addChannelRectangles(geo, offset_grow, grow_length + 2.0*split_length);
+		addMixingRectangles(geo, offset_mix); 
+	}	
+	if(n_mix < 2)
+		offset_grow += grow_length + split_length + mix_length;
+	else
+		offset_grow += offset_mix_width;
+
+	addChannelRectangles(geo, offset_grow, grow_length + split_length);
+
+	// set boundary:
+	Point<dim> lower, upper;
+
+	for(unsigned int i = 0; i < dim; ++i)
+		lower[i] = 0;
+
+	upper[0] = offset_grow + grow_length + split_length + right;
+	upper[1] = height;
+	// if(dim == 3)
+	// 	upper[2] // extruded amount
+
+	geo.setBottomLeftPoint(lower);
+	geo.setTopRightPoint(upper);
+
+	// Set Boundary Condtions:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
+}
+
+template<int dim>
+void
+ChannelMixer<dim>::addChannelRectangles(Geometry<dim>& geo, double offset, double width) const
+{
+	Point<dim> lower, upper;
+	lower[0] = offset;
+	upper[0] = offset + width;
+
+	for(unsigned int i = 0; i < (number_channels-1); ++i)
+	{
+		lower[1] = channel_thickness + i*(wall_thickness+channel_thickness);
+		upper[1] = lower[1] + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));
+	}
+}
+
+template<int dim>
+void
+ChannelMixer<dim>::addMixingRectangles(Geometry<dim>& geo, double offset) const
+{
+	const double width = 2.*split_length + mix_length;
+
+	Point<dim> lower, upper;
+	lower[0] = offset + grow_length;
+	upper[0] = lower[0] + width;
+
+	lower[1] = half_channel;
+	for(unsigned int i = 0; i < number_channels; ++i)
+	{
+		upper[1] = lower[1] + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));
+		lower[1] =lower[1] + (wall_thickness+channel_thickness);
+	}
 }
 
 template<int dim>
