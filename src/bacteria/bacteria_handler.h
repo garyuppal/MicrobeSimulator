@@ -121,7 +121,7 @@ private:
 	std::vector<double> pg_rates;
 
 	void remove_and_capture_fallen_bacteria(
-		double right_edge, std::vector<double>& pg_rates);
+		double right_edge, std::vector<double>& pg_rates, int direction);
 
 	void add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo);
 };
@@ -255,11 +255,16 @@ BacteriaHandler<dim>::move(double dt, const Geometry<dim>& geometry,
 		bacteria[i]->randomStep(dt, diffusion_constant, 
 			geometry, velocity, edge_buffer);
 
+	const int direction = velocity.get_direction();
 	// if boundary is open, remove fallen bacteria:
 	if(geometry.getBoundaryConditions()[0] == BoundaryCondition::OPEN)
-		remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0] - right_open_buffer,
-											pg_rates);	
+		if(direction > 0) 	// add direction..., want left point for opposite direction
 
+			remove_and_capture_fallen_bacteria(geometry.getTopRightPoint()[0] - right_open_buffer,
+												pg_rates, direction);
+		else
+			remove_and_capture_fallen_bacteria(geometry.getBottomLeftPoint()[0] + right_open_buffer,
+												pg_rates, direction);
 }
 
 template<int dim>
@@ -317,22 +322,43 @@ BacteriaHandler<dim>::mutate(double dt)
 template<int dim>
 void 
 BacteriaHandler<dim>::remove_and_capture_fallen_bacteria(
-	double right_edge, std::vector<double>& pg_rates)
+	double right_edge, std::vector<double>& pg_rates, int direction)
 {
 	const double tolerance = 1e-4;
-	for(auto it = bacteria.begin(); it != bacteria.end(); )
+
+	if(direction > 0)
 	{
-		if( (*it)->getLocation()[0] > (right_edge - tolerance) ) 
+		for(auto it = bacteria.begin(); it != bacteria.end(); )
 		{
-			pg_rates.emplace_back((*it)->getSecretionRate(0)); 
-				/** @todo generalize to multiple public goods */
-			it = bacteria.erase(it);
-		}
-		else
+			if( (*it)->getLocation()[0] > (right_edge - tolerance) ) 
+			{
+				pg_rates.emplace_back((*it)->getSecretionRate(0)); 
+					/** @todo generalize to multiple public goods */
+				it = bacteria.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		} // for all bacteria
+	}
+	else
+	{
+		for(auto it = bacteria.begin(); it != bacteria.end(); )
 		{
-			++it;
-		}
-	} // for all bacteria
+			if( (*it)->getLocation()[0] < (right_edge + tolerance) ) 
+			{
+				pg_rates.emplace_back((*it)->getSecretionRate(0)); 
+					/** @todo generalize to multiple public goods */
+				it = bacteria.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		} // for all bacteria
+	}
+
 } // remove_and_capture_fallen_bacteria()
 
 // LEGACY.... REMOVE

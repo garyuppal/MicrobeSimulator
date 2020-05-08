@@ -68,6 +68,31 @@ using dealii::Triangulation;
 	  prm.leave_subsection();
 	}
 
+	template<int dim>
+	void 
+	addRectangle(Triangulation<dim>& tria, 
+	const std::vector< std::vector< double > > &  step_sizes,
+	const Point<dim>& lower, 
+	const Point<dim>& upper)
+	{
+		Triangulation<2> aux;
+
+		dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+													step_sizes,
+													lower,
+													upper);
+
+		// merge:
+		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+	}
+
+	std::vector<double> 
+	getSteps(double length, double dx)
+	{
+		const unsigned int ndivs = std::round(length/dx);
+		const double step = length/((double)ndivs);
+		return std::vector<double>(ndivs, step);
+	}
 	// CONSTANTS FOR GRID GENERATION AND BOUNDARY IDENTIFICATION
 	// --------------------------------------------------------------------------------------
 	/** left boundary id */
@@ -250,20 +275,22 @@ BuilderBase<dim>::set_rectangle_boundary_ids(const Geometry<dim>& geo, Triangula
 	{
 		for(unsigned int f=0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f)
 		{
-			unsigned int bid_rect = GridGenerationTools::id_rectangle_begin;
-
-			for(unsigned int i = 0; i < rects.size(); ++i)
+			if(cell->face(f)->at_boundary())
 			{
+				unsigned int bid_rect = GridGenerationTools::id_rectangle_begin;
 
-				const double distance_to_rectangle_border =
-				rects[i].distance_from_border(cell->face(f)->center());
+				for(unsigned int i = 0; i < rects.size(); ++i)
+				{
 
-				if ( distance_to_rectangle_border < edge_tolerance)
-					cell->face(f)->set_boundary_id(bid_rect);
-			} // for rectangles
+					const double distance_to_rectangle_border =
+					rects[i].distance_from_border(cell->face(f)->center());
 
-			++bid_rect;
+					if ( distance_to_rectangle_border < edge_tolerance)
+						cell->face(f)->set_boundary_id(bid_rect);
+				} // for rectangles
 
+				++bid_rect;
+			}
 		} // for faces
 	} // for cells
 } // set rectangle boundary ids
@@ -982,10 +1009,10 @@ private:
 	void addSplittingRectangles(Triangulation<dim>& tria, double offset) const;
 	void build_attach_right_side(Triangulation<dim>& tria, double offset) const;
 
-	void addRectangle(Triangulation<dim>& tria,
-	const std::vector< std::vector< double > > &  step_sizes,
-	const Point<dim>& lower, 
-	const Point<dim>& upper) const;
+	// void addRectangle(Triangulation<dim>& tria,
+	// const std::vector< std::vector< double > > &  step_sizes,
+	// const Point<dim>& lower, 
+	// const Point<dim>& upper) const;
 
 	// extrusion to 3D:
 	// void extrude(Triangulation<dim>& filter_twodim);
@@ -1165,26 +1192,6 @@ ChannelMixer<dim>::build_grid_base(const Geometry<dim>& /* geo */, Triangulation
 		addChannelRectangles(tria, offset_grow);
 	}
 
-	// for(unsigned int i = 0; i < n_mix-1; ++i)
-	// {
-	// 	offset_mix += offset_mix_width;
-	// 	if(i==0)
-	// 		offset_grow += grow_length + split_length + mix_length;
-	// 	else
-	// 		offset_grow += offset_mix_width;
-
-	// 	addChannelRectangles(tria, offset_grow);
-	// 	addSplittingRectangles(tria, offset_mix);
-	// 	addMixingRectangles(tria, offset_mix + split_length); 
-	// 	addSplittingRectangles(tria, offset_mix + mix_length + split_length);
-	// }	
-	// if(n_mix < 2)
-	// 	offset_grow += grow_length + split_length + mix_length;
-	// else
-	// 	offset_grow += offset_mix_width;
-
-	// addChannelRectangles(tria, offset_grow);
-
 	build_attach_right_side(tria, offset_grow + grow_length);
 }
 
@@ -1194,7 +1201,8 @@ template<int dim>
 void 
 ChannelMixer<dim>::build_left_side(Triangulation<dim>& tria) const
 {
-	std::vector<double> x_divisions = {left};
+	std::vector<double> x_divisions = GridGenerationTools::getSteps(left, half_channel);
+	// {left};
 
 	std::vector<double> y_divisions; // split 
 
@@ -1219,7 +1227,8 @@ template<int dim>
 void 
 ChannelMixer<dim>::addChannelRectangles(Triangulation<dim>& tria, double offset) const
 {
-	std::vector<double> x_divisions = {grow_length};
+	std::vector<double> x_divisions =  GridGenerationTools::getSteps(grow_length, half_channel);
+	// {grow_length};
 
 	std::vector<double> y_divisions; // split 
 	y_divisions.reserve(3);
@@ -1238,7 +1247,7 @@ ChannelMixer<dim>::addChannelRectangles(Triangulation<dim>& tria, double offset)
 	for(unsigned int i = 0; i < number_channels; ++i)
 	{
 		upper[1] = lower[1] + channel_thickness;
-		addRectangle(tria, step_sizes, lower, upper);
+		GridGenerationTools::addRectangle(tria, step_sizes, lower, upper);
 
 		lower[1] = lower[1] + channel_thickness + wall_thickness;
 	}
@@ -1249,7 +1258,8 @@ void
 ChannelMixer<dim>::addMixingRectangles(Triangulation<dim>& tria, double offset) const
 {
 	// first:
-	std::vector<double> x_divisions = {mix_length};
+	std::vector<double> x_divisions =  GridGenerationTools::getSteps(mix_length, half_channel);
+	// {mix_length};
 	std::vector<double> outer_y_divisions = {half_channel - 0.5*wall_thickness};
 	
 	std::vector< std::vector< double > >  outer_step_sizes = {x_divisions, outer_y_divisions};
@@ -1261,7 +1271,7 @@ ChannelMixer<dim>::addMixingRectangles(Triangulation<dim>& tria, double offset) 
 
 	lower[1] = 0.;
 	upper[1] = lower[1] + half_channel - 0.5*wall_thickness;
-	addRectangle(tria, outer_step_sizes, lower, upper);
+	GridGenerationTools::addRectangle(tria, outer_step_sizes, lower, upper);
 
 	// middle ones:
 	std::vector<double> y_divisions;
@@ -1276,20 +1286,21 @@ ChannelMixer<dim>::addMixingRectangles(Triangulation<dim>& tria, double offset) 
 	for(unsigned int i = 0; i < number_channels-1; ++i)
 	{
 		upper[1] = lower[1] + channel_thickness;
-		addRectangle(tria, step_sizes, lower, upper);
+		GridGenerationTools::addRectangle(tria, step_sizes, lower, upper);
 		lower[1] = lower[1] + channel_thickness + wall_thickness;
 	}
 
 	// last:
 	upper[1] = lower[1] + channel_thickness;
-	addRectangle(tria, outer_step_sizes, lower, upper);
+	GridGenerationTools::addRectangle(tria, outer_step_sizes, lower, upper);
 }
 
 template<int dim>
 void 
 ChannelMixer<dim>::addSplittingRectangles(Triangulation<dim>& tria, double offset) const
 {
-	std::vector<double> x_divisions = {split_length};
+	std::vector<double> x_divisions =  GridGenerationTools::getSteps(split_length, half_channel);
+	// {split_length};
 	std::vector<double> y_divisions = {half_channel - 0.5*wall_thickness};
 	
 	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
@@ -1305,7 +1316,7 @@ ChannelMixer<dim>::addSplittingRectangles(Triangulation<dim>& tria, double offse
 	for(unsigned int i = 0; i < n_split; ++i)
 	{
 		upper[1] = lower[1] + half_channel - 0.5*wall_thickness;
-		addRectangle(tria, step_sizes, lower, upper);
+		GridGenerationTools::addRectangle(tria, step_sizes, lower, upper);
 
 		lower[1] = lower[1] + half_channel + 0.5*wall_thickness;
 	}
@@ -1315,7 +1326,8 @@ template<int dim>
 void 
 ChannelMixer<dim>::build_attach_right_side(Triangulation<dim>& tria, double offset) const
 {
-	std::vector<double> x_divisions = {right};
+	std::vector<double> x_divisions =  GridGenerationTools::getSteps(right, half_channel);
+	// {right};
 
 	std::vector<double> y_divisions; // split 
 
@@ -1330,25 +1342,8 @@ ChannelMixer<dim>::build_attach_right_side(Triangulation<dim>& tria, double offs
 
 	std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
 
-	addRectangle(tria, step_sizes, Point<2>(offset,0), Point<2>(offset + right, height));
-}
-
-template<int dim>
-void 
-ChannelMixer<dim>::addRectangle(Triangulation<dim>& tria, 
-	const std::vector< std::vector< double > > &  step_sizes,
-	const Point<dim>& lower, 
-	const Point<dim>& upper) const
-{
-	Triangulation<2> aux;
-
-	dealii::GridGenerator::subdivided_hyper_rectangle(aux,
-												step_sizes,
-												lower,
-												upper);
-
-	// merge:
-	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+	GridGenerationTools::addRectangle(
+		tria, step_sizes, Point<2>(offset,0), Point<2>(offset + right, height));
 }
 
 template<int dim>
@@ -2295,6 +2290,481 @@ BowTie<dim>::printInfo(std::ostream& out) const
 
 
 // -------------------------------------------------------------------------------
+// 		FANOUT:
+// -------------------------------------------------------------------------------
+/** \brief Class to build fan out geometry */
+/**
+* Run flow in reverse to get a fan in
+*/
+template<int dim>
+class FanOut : public BuilderBase<dim>{
+public:
+	// constructor
+	FanOut(const ParameterHandler& prm);
+
+	// class parameters:
+	static void declare_parameters(ParameterHandler& prm);
+
+	// override virtual methods:
+	void build_geometry(Geometry<dim>& geo) const override; 
+	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+	void printInfo(std::ostream& out) const override;
+private:
+	unsigned int n_sections;
+	double section_length;
+	double transition_gap;
+
+	double channel_thickness;
+	double wall_thickness;
+
+	double left;
+	double right;
+
+	// aux:
+	double height;
+	double width;
+	double dx;
+
+	// helper methods:
+	void addRectangles(Geometry<dim>& geo) const;
+	void addCapRectangles(Geometry<dim>& geo, unsigned int i) const; // gives wrong in bounds domain
+	void addCapLines(Geometry<dim>& geo, unsigned int i) const;
+	void addCenterRectangles(Geometry<dim>& geo) const;
+
+	// meshing support:
+	void build_left_side(Triangulation<dim>& tria) const; // including zeroth section
+	void add_section(Triangulation<dim>& tria, unsigned int i) const;
+	void add_right_side(Triangulation<dim>& tria) const;
+};
+
+// IMPL
+// -------------------------------------------------------------------------
+
+// constructor
+/** \brief Constuctor for FanOut class */
+template<int dim>
+FanOut<dim>::FanOut(const ParameterHandler& prm)
+	:
+	BuilderBase<dim>(prm) // gets mesh refinement parameters
+{
+	const std::string section = "Geometry.Fan Out";
+
+	n_sections = prm.get_unsigned(section, "Number sections");
+	section_length = prm.get_double(section, "Section length");
+	transition_gap = prm.get_double(section, "Transition gap");
+
+	channel_thickness = prm.get_double(section, "Channel thickness");
+	wall_thickness = prm.get_double(section, "Wall thickness");
+
+	left = prm.get_double(section, "Left");
+	right = prm.get_double(section, "Right");
+
+	// aux:
+	height = (2.0*n_sections)*(channel_thickness + wall_thickness) - wall_thickness;
+	width = left + (n_sections+1)*section_length + right;
+
+	dx = (transition_gap < section_length)? transition_gap : section_length;
+}
+
+// class parameters:
+/** \brief Declare parameters for FanOut class */
+template<int dim>
+void 
+FanOut<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("Fan Out");
+			prm.declare_entry("Number sections","1",Patterns::Unsigned());
+			prm.declare_entry("Section length","1",Patterns::Double());
+			prm.declare_entry("Transition gap","1",Patterns::Double());
+
+			prm.declare_entry("Channel thickness","1",Patterns::Double());
+			prm.declare_entry("Wall thickness","1",Patterns::Double());
+
+			prm.declare_entry("Left","1",Patterns::Double());
+			prm.declare_entry("Right","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+template<int dim>
+void 
+FanOut<dim>::build_geometry(Geometry<dim>& geo) const
+{
+	// set boundary:
+	geo.setBottomLeftPoint(Point<2>(0,0)); // not for 3d
+	geo.setTopRightPoint(Point<2>(width,height));
+
+	// Set Boundary Condtions:
+	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+	for(unsigned int i = 1; i < dim; ++i)
+		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
+	
+	addRectangles(geo);
+}
+
+template<int dim>
+void 
+FanOut<dim>::addRectangles(Geometry<dim>& geo) const
+{
+	Point<dim> bottom_left, top_right;
+
+	// zeroth + first sections:
+	bottom_left[0] = 0;
+	top_right[0] = bottom_left[0] + left + 2*section_length;
+
+	// bottom rectangle:
+	top_right[1] = 0.5*height - channel_thickness - 0.5*wall_thickness;
+	bottom_left[1] = top_right[1]; // - wall_thickness;
+	// geo.addRectangle(HyperRectangle<dim>(bottom_left,top_right));
+	geo.addLine(Line(bottom_left,top_right,Line::ABOVE));
+
+	// top rectangle:
+	bottom_left[1] = 0.5*height + channel_thickness + 0.5*wall_thickness;
+	top_right[1] = bottom_left[1]; // + wall_thickness;
+	// geo.addRectangle(HyperRectangle<dim>(bottom_left,top_right));
+	geo.addLine(Line(bottom_left,top_right,Line::BELOW));
+
+	for(unsigned int i = 2; i <= n_sections; ++i)
+	{
+		// addCapRectangles(geo, i);
+		addCapLines(geo,i);
+	}
+	addCenterRectangles(geo);
+}
+
+template<int dim>
+void 
+FanOut<dim>::addCapRectangles(Geometry<dim>& geo, unsigned int i) const
+{
+	const double x_left = left + i*section_length;
+	const double section_height = (2.0*i - 1.0)*wall_thickness 
+		+ 2.0*i*channel_thickness;
+	const double bottom_y = 0.5*(height - section_height);
+
+	const double cap_height = channel_thickness; // + 2.*wall_thickness;
+		// (i==1)? 
+		// 0.5*channel_thickness + wall_thickness :
+		// channel_thickness + 2.*wall_thickness;
+
+	Point<dim> lower, upper;
+
+	if(i != n_sections)
+	{
+		//bottom:
+		lower[0] = x_left;
+		upper[0] = lower[0] + section_length;
+		lower[1] = bottom_y; // - wall_thickness;
+		upper[1] = lower[1]; // + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));
+	} // no need for final rectangles
+
+	// bottom cap:
+	lower[0] = x_left; // - wall_thickness;
+	upper[0] = x_left;
+	lower[1] = bottom_y; // - wall_thickness;
+	upper[1] = lower[1] + cap_height;
+	geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+
+	if(i != n_sections)
+	{
+		// top:
+		lower[0] = x_left;
+		upper[0] = lower[0] + section_length;
+		lower[1] = bottom_y + section_height;
+		upper[1] = lower[1]; // + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+	} // no need for final rectangles
+
+	// top cap:
+	lower[0] = x_left; // - wall_thickness;
+	upper[0] = x_left;
+	upper[1] = bottom_y + section_height; // + wall_thickness;
+	lower[1] = upper[1] - cap_height;
+	geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+}
+
+
+template<int dim>
+void 
+FanOut<dim>::addCapLines(Geometry<dim>& geo, unsigned int i) const
+{
+	const double x_left = left + i*section_length;
+	const double section_height = (2.0*i - 1.0)*wall_thickness 
+		+ 2.0*i*channel_thickness;
+	const double bottom_y = 0.5*(height - section_height);
+
+	const double cap_height = channel_thickness; // + 2.*wall_thickness;
+		// (i==1)? 
+		// 0.5*channel_thickness + wall_thickness :
+		// channel_thickness + 2.*wall_thickness;
+	
+	Point<dim> lower, upper;
+
+	if(i != n_sections)
+	{
+		//bottom:
+		lower[0] = x_left;
+		upper[0] = lower[0] + section_length;
+		lower[1] = bottom_y; // - wall_thickness;
+		upper[1] = lower[1]; // + wall_thickness;
+		geo.addLine(Line(lower,upper,Line::ABOVE));
+	} // no need for final rectangles
+
+	// bottom cap:
+	lower[0] = x_left; // - wall_thickness;
+	upper[0] = x_left;
+	lower[1] = bottom_y; // - wall_thickness;
+	upper[1] = lower[1] + cap_height;
+	geo.addLine(Line(lower,upper,Line::BELOW));
+
+	if(i != n_sections)
+	{
+		// top:
+		lower[0] = x_left;
+		upper[0] = lower[0] + section_length;
+		lower[1] = bottom_y + section_height;
+		upper[1] = lower[1]; // + wall_thickness;
+		geo.addLine(Line(lower,upper,Line::BELOW));
+	} // no need for final rectangles
+
+	// top cap:
+	lower[0] = x_left; // - wall_thickness;
+	upper[0] = x_left;
+	upper[1] = bottom_y + section_height; // + wall_thickness;
+	lower[1] = upper[1] - cap_height;
+	geo.addLine(Line(lower,upper,Line::BELOW));
+}
+
+template<int dim>
+void 
+FanOut<dim>::addCenterRectangles(Geometry<dim>& geo) const
+{
+	// start with right end...
+	const double right_x = left + (n_sections+1.0)*section_length;
+
+	Point<dim> lower, upper;
+	upper[0] = right_x; // for all
+
+	// central rectangle:
+	double r_len = n_sections*section_length - transition_gap;
+	lower[0] = upper[0] - r_len;
+
+	lower[1] = 0.5*(height - wall_thickness);
+	upper[1] = lower[1] + wall_thickness;
+	geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+
+	const double center = 0.5*height;
+	// off center rectangles:
+	for(unsigned int i = 1; i < n_sections; ++i)
+	{
+		// left end:
+		lower[0] = right_x - (n_sections-i)*section_length + transition_gap;
+
+		// upper:
+		lower[1] = center - 0.5*wall_thickness 
+			+ i*(wall_thickness+channel_thickness);
+		upper[1] = lower[1] + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+		
+		// lower:
+		lower[1] = center - 0.5*wall_thickness 
+			- i*(wall_thickness+channel_thickness);
+		upper[1] = lower[1] + wall_thickness;
+		geo.addRectangle(HyperRectangle<dim>(lower,upper));	
+	}
+}
+
+template<int dim>
+void 
+FanOut<dim>::build_grid_base(const Geometry<dim>& /*geo*/, Triangulation<dim>& tria) const
+{
+	build_left_side(tria); // including zeroth section
+	
+	for(unsigned int i = 1; i <= n_sections; ++i)
+		add_section(tria, i);
+
+	add_right_side(tria);
+}
+
+template<int dim>
+void 
+FanOut<dim>::build_left_side(Triangulation<dim>& tria) const
+{
+	const double x_len = left + section_length;
+	const unsigned int nxDivs = std::round(x_len/dx);
+	const double localDX = x_len/((double)nxDivs);
+	std::vector<double> x_div(nxDivs, localDX);
+
+	std::vector<double> y_div = {channel_thickness, wall_thickness, channel_thickness};
+
+	std::vector<std::vector<double> > steps = {x_div, y_div};
+	const double y_start = 0.5*height - channel_thickness - 0.5*wall_thickness;
+	const double zsh = 2*channel_thickness + wall_thickness;
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(tria,
+                                            steps,
+                                            Point<2>(0, y_start), // bottom corner
+                                            Point<2>(left + section_length, y_start + zsh));
+}
+
+template<int dim>
+void 
+FanOut<dim>::add_section(Triangulation<dim>& tria, unsigned int i) const
+{
+	const double section_height = (2.0*i - 1.0)*wall_thickness 
+		+ 2.0*i*channel_thickness;
+	const double bottom_y = 0.5*(height - section_height);
+
+	Triangulation<dim> section;
+	// divisions are always channel_thickness and wall_thickness
+
+	Point<dim> lower, upper;
+
+	// split each section into a gap portion and a channel portion
+
+	// gap portion:
+	lower[0] = left + i*section_length;
+	upper[0] = lower[0] + transition_gap;
+
+	// start at bottom:
+	lower[1] = bottom_y;
+	upper[1] = lower[1] + channel_thickness;
+	dealii::GridGenerator::hyper_rectangle(section, lower, upper);
+
+	// add rectangles:
+	for(unsigned int j =0; j < (2*i-1); ++j)
+	{		
+		// wall:
+		lower[1] = bottom_y + channel_thickness + j*(channel_thickness + wall_thickness);
+		upper[1] = lower[1] + wall_thickness;
+		{
+			const double x_len = upper[0]-lower[0];
+			const unsigned int nxDivs = std::round(x_len/dx);
+			const double localDX = x_len/((double)nxDivs);
+			std::vector<double> x_div(nxDivs, localDX);
+
+			std::vector<double> y_div = {upper[1]-lower[1]};
+			std::vector<std::vector< double > > steps = {x_div, y_div};
+			GridGenerationTools::addRectangle(section, steps, lower, upper);
+		}
+
+		// channel:
+		lower[1] = upper[1];
+		upper[1] = lower[1] + channel_thickness;
+		{
+			const double x_len = upper[0]-lower[0];
+			const unsigned int nxDivs = std::round(x_len/dx);
+			const double localDX = x_len/((double)nxDivs);
+			std::vector<double> x_div(nxDivs, localDX);
+			
+			std::vector<double> y_div = {upper[1]-lower[1]};			
+			std::vector<std::vector< double > > steps = {x_div, y_div};
+			GridGenerationTools::addRectangle(section, steps, lower, upper);
+		}
+	}
+
+
+	// channel portion:
+	lower[0] = lower[0] + transition_gap;
+	upper[0] = lower[0] + section_length - transition_gap;
+
+	// add rectangles:
+	// start at bottom:
+	lower[1] = bottom_y;
+	upper[1] = lower[1] + channel_thickness;
+	{
+		const double x_len = upper[0]-lower[0];
+		const unsigned int nxDivs = std::round(x_len/dx);
+		const double localDX = x_len/((double)nxDivs);
+		std::vector<double> x_div(nxDivs, localDX);
+		
+		std::vector<double> y_div = {upper[1]-lower[1]};
+		std::vector<std::vector< double > > steps = {x_div, y_div};
+		GridGenerationTools::addRectangle(section, steps, lower, upper);
+	}
+	
+	// add rectangles:
+	for(unsigned int j =0; j < (2*i-1); ++j)
+	{		
+		// skip wall:
+		lower[1] = bottom_y + channel_thickness + j*(channel_thickness + wall_thickness);
+		upper[1] = lower[1] + wall_thickness;
+
+		// channel:
+		lower[1] = upper[1];
+		upper[1] = lower[1] + channel_thickness;
+		{
+			const double x_len = upper[0]-lower[0];
+			const unsigned int nxDivs = std::round(x_len/dx);
+			const double localDX = x_len/((double)nxDivs);
+			std::vector<double> x_div(nxDivs, localDX);
+			
+			std::vector<double> y_div = {upper[1]-lower[1]};
+			std::vector<std::vector< double > > steps = {x_div, y_div};
+			GridGenerationTools::addRectangle(section, steps, lower, upper);
+		}
+	}
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(section, tria, tria);
+}
+
+/** \brief Add right side to fanout mesh */
+template<int dim>
+void 
+FanOut<dim>::add_right_side(Triangulation<dim>& tria) const
+{
+	Point<dim> lower, upper;
+	upper[0] = width;
+	lower[0] = upper[0] - right;
+	lower[1] = 0.;
+	upper[1] = height;
+
+	const unsigned int nxDivs = std::round(right/dx);
+	const double localDX = right/((double)nxDivs);
+	std::vector<double> x_div(nxDivs, localDX);
+
+	std::vector<double> y_div;
+	const unsigned int n_channels = 2*n_sections;
+	// first channel:
+	y_div.emplace_back(channel_thickness);
+	for(unsigned int i = 1; i < n_channels; ++i)
+	{
+		y_div.emplace_back(wall_thickness);
+		y_div.emplace_back(channel_thickness);
+	}
+
+	std::vector<std::vector< double > > steps = {x_div, y_div};
+	GridGenerationTools::addRectangle(tria, steps, lower, upper);
+}
+
+/** \brief Print Fan Out geometry info */
+template<int dim>
+void 
+FanOut<dim>::printInfo(std::ostream& out) const
+{
+	out << Utility::short_line << std::endl
+		<< "\t Fan Out:" << std::endl
+		<< Utility::short_line << std::endl
+		<< "Number sections: " << n_sections << std::endl
+		<< "Section length: " << section_length << std::endl
+		<< "Transition gap: " << transition_gap << std::endl
+		<< "Channel thickness: " << channel_thickness << std::endl
+		<< "Wall thickness: " << wall_thickness << std::endl
+		<< "Left: " << left << std::endl
+		// << "Funnel length: " << funnel_length << std::endl
+		<< "Right : " << right << std::endl
+		<< "Height : " << height << std::endl
+		<< "Width : " << width << std::endl
+		<< Utility::short_line << std::endl << std::endl;
+}
+
+
+
+
+
+// -------------------------------------------------------------------------------
 // 		SPLITTER:
 // -------------------------------------------------------------------------------
 /** \brief Splitter class to construct splitter geometry and grid  */
@@ -2663,6 +3133,11 @@ private:
 
 	void tile_geometry(Geometry<dim>& geo) const;
 	void tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const;
+
+	// options to extrude to 3D here!
+	// bool extrudeable;
+	void extrude_geometry(Geometry<dim>& geo) const;
+	void extrude_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const;
 };
 
 // IMPL
@@ -2694,6 +3169,8 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	}
 	else if( boost::iequals(geometry_type, "BowTie") )
 		builder = std::make_shared<BowTie<dim> >(prm);
+	else if( boost::iequals(geometry_type, "Fan Out") )
+		builder = std::make_shared<FanOut<dim> >(prm);
 	else if( boost::iequals(geometry_type, "Channel Mixer") )
 		builder = std::make_shared<ChannelMixer<dim> >(prm);
 	// else if( boost::iequals(geometry_type, "File") )
@@ -2712,7 +3189,8 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Geometry");
 		prm.declare_entry("Geometry type",
 		          "Box",
-		          Patterns::Selection("Box|Filter|Mixer|Splitter|Funnel|BowTie|Channel Mixer|File"),
+		          Patterns::Selection("Box|Filter|Mixer|Splitter|Funnel|"
+		          	"BowTie|Channel Mixer|Fan Out|File"),
 		          "Geometry type. Options are Box, Filter, Mixer "
 		          "Splitter, Funnel, BowTie, or File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
@@ -2727,6 +3205,7 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Cylinder<dim>::declare_parameters(prm);
 	Funnel<dim>::declare_parameters(prm); // also for bowtie
 	ChannelMixer<dim>::declare_parameters(prm);
+	FanOut<dim>::declare_parameters(prm);
 }
 
 // Main Methods:
@@ -2740,6 +3219,12 @@ GeometryBuilder<dim>::build_geometry(Geometry<dim>& geo) const
 	// tile
 	if(tileable && (n_tiles > 1))
 		tile_geometry(geo);
+
+	if(dim == 3)
+	{
+		extrude_geometry(geo); // now, may not want for all base geometries
+		throw std::runtime_error("3d extrusion not yet implemented");
+	}
 }
 
 /** \brief Build grid */
@@ -2755,6 +3240,9 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	// tile
 	if(tileable && (n_tiles > 1))
 		tile_mesh(geo, tria);
+
+	if(dim == 3)
+		extrude_mesh(geo, tria);
 
 	// set boundary labels:
 	builder->set_edge_boundary_ids(geo, tria);
@@ -2862,6 +3350,27 @@ GeometryBuilder<dim>::tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tr
 		// merge shifted copy:
 		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
 	}
+}
+
+/** \brief Option to extrude 2d base geometry to 3d */
+/** @todo still need to implement, many of the templated classes above only need to
+* be implemented in 2d and then simply extruded */
+/** @todo need to change funnel lines to hyperrectangles at an angle */
+template<int dim>
+void 
+GeometryBuilder<dim>::extrude_geometry(Geometry<dim>& /*geo*/) const
+{
+	throw std::runtime_error("need to implement geometry extrusion");
+}
+
+/** \brief Option to extrude 2d base mesh to 3d */
+/** @todo still need to implement, many of the templated classes above only need to
+* be implemented in 2d and then simply extruded */
+template<int dim>
+void 
+GeometryBuilder<dim>::extrude_mesh(const Geometry<dim>& /*geo*/, Triangulation<dim>& /*tria*/) const
+{
+	throw std::runtime_error("need to implement mesh extrusion");
 }
 
 /** \brief Display builder (geometry type) info */

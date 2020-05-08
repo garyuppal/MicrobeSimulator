@@ -559,7 +559,7 @@ Geometry<dim>::printInfo(std::ostream& out) const
 
 	out << "\nLINES: " << lines.size() << std::endl;
 	for(unsigned int i = 0; i < lines.size(); ++i)
-		lines[i].print(out);
+		lines[i].printInfo(out);
 
 	out << Utility::medium_line << std::endl
 			<< std::endl << std::endl;

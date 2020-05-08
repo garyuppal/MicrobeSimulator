@@ -29,6 +29,8 @@ public:
 			Triangulation<dim>& triangulation,
 			const std::string& output_directory); // instead of using simulation tools
 
+	int get_direction() const;
+
 	// from interface:
 	Tensor<1, dim> value(const Point<dim>& location) const;
 	double get_maximum_velocity(double max_coordinate) const;
@@ -53,6 +55,7 @@ public:
 	void printInfo(std::ostream& out) const;
 private:
 	std::shared_ptr<VelocityInterface<dim> >	velocity_function;
+	int direction;
 };
 
 // IMPLEMENTATION:
@@ -88,6 +91,9 @@ AdvectionHandler<dim>::init(const ParameterHandler& prm,
 			const std::string& output_directory)
 {
 	std::string section = "Advection";
+
+	double maxvel = prm.get_double(section, "Maximum velocity");
+	direction = (maxvel<0)? -1 : 1;
 
 	std::string velocity_type = prm.get_string(section,"Velocity type");
 
@@ -140,6 +146,12 @@ AdvectionHandler<dim>::init(const ParameterHandler& prm,
 	// void setup_rankine_vortex(double gamma, double radius);
 }
 
+template<int dim>
+int 
+AdvectionHandler<dim>::get_direction() const
+{
+	return direction;
+}
 
 // FROM INTERFACE:
 template<int dim>

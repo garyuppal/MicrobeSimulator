@@ -498,7 +498,7 @@ StokesSolver<dim>::setup_dofs(const double inlet_velocity)
 
 	// DIRECHLET BOUNDARY CONDITIONS:
 	{
-		const unsigned int inlet_boundary_id = 0; // 1 is open
+		const unsigned int inlet_boundary_id = (inlet_velocity >=0)? 0: 1; // 1 is open, flip if negative velocity
 
 		stokes_constraints.clear ();
 		FEValuesExtractors::Vector velocities(0);

@@ -65,6 +65,7 @@ int main(int argc, char** argv)
 			Simulation::Simulator<2> sim(cmd_prm);
 			sim.run();
 			// sim.test_mesh();
+			// sim.test_random_walk_boundaries();
 		}
 		else if(cmd_prm.getDimension() == 3)
 		{
