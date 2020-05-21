@@ -50,8 +50,9 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		  		left_start_buffer = 0;
 
 		    temp_point[dim_itr] = (width)*((double)rand() / RAND_MAX) 
-		      + geometry.getBottomLeftPoint()[dim_itr] + buffer + left_start_buffer;
-		  }
+		      + geometry.getBottomLeftPoint()[dim_itr] + buffer;
+		  } // set temp point
+	  	temp_point[0] = temp_point[0] + left_start_buffer; // buffer for left side (x axis)
 
 		  if( geometry.isInDomain(temp_point, buffer) )
 		  {
@@ -59,6 +60,7 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		    found = true;
 		  }
 		} // while not found
+
 	} // for group locations
 	std::cout << "...Group positions found." << std::endl;
 

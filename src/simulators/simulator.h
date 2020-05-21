@@ -4,7 +4,10 @@
 #include <deal.II/grid/tria.h>
 using dealii::Triangulation;
 
-#include "../bacteria/bacteria_handler.h" 
+#include "../bacteria/bacteria_handler.h"
+
+// #include "../bacteria/bacteria.h"
+
 #include "../bacteria/bacteria_fitness.h"
 #include "../advection/advection_handler.h"
 #include "../geometry/geometry.h"
@@ -67,6 +70,8 @@ private:
 
 	Bacteria::BacteriaHandler<dim>			bacteria;
 	Bacteria::TestNewFitness::Fitness_Function<dim>	 fitness_function;
+
+	// BacteriaTools::Bacteria<dim>		test_new_bacteria;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;

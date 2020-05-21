@@ -190,88 +190,113 @@ BacteriumBase<dim>::print(std::ostream& out) const
 	out << secretion_rates[secretion_rates.size()-1];
 }
 
-// ------------------------------------------------------------------------------
-// IC-AS BACTERIA
-// ------------------------------------------------------------------------------
-
-template<int dim>
-class IC_Bacterium : public BacteriumBase<dim>{
-	IC_Bacterium();
-	IC_Bacterium(const Point<dim>& p);
-	IC_Bacterium(const std::vector<double>& rates);
-	IC_Bacterium(const Point<dim>& p,
-				const std::vector<double>& rates);
-	IC_Bacterium(const Point<dim>& p,
-				const std::vector<double>& rates,
-				double t);
-	// 	BacteriumBase(const Point<dim>& p);
-	// BacteriumBase(const std::vector<double>& rates);
-	// BacteriumBase(const Point<dim>& p, 
-	// 				const std::vector<double>& rates);
 
 
-	// VIRTUAL METHODS:
-	// virtual since can be overridden by chemotaxis for example
-	// virtual void randomStep(double time_step, 
-	// 					double diffusion_constant,
-	// 					const Geometry<dim>& geo,
-	// 					const Velocity::AdvectionHandler<dim>& velocity);  // same as base
+// IC with various types ... or different types...
+// common methods:
+// - update internal clock (for switching)
+// - update history (for secreting...)
 
-	// virtual double getFitness(const FitnessBase<dim>& fitness_function) const; 
-//TODO:		// modify???
-	std::unique_ptr<BacteriumBase<dim> > clone() const override;
 
-protected:
-	double time;
-};
 
-// IMPL
-// ---------------------------------------------------------------------
-template<int dim>
-IC_Bacterium<dim>::IC_Bacterium()
-	:
-	BacteriumBase<dim>(),
-	time(0)
-{}
 
-template<int dim>
-IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p)
-	:
-	BacteriumBase<dim>(p),
-	time(0)
-{}
 
-template<int dim>
-IC_Bacterium<dim>::IC_Bacterium(const std::vector<double>& rates)
-	:
-	BacteriumBase<dim>(rates),
-	time(0)
-{}
 
-template<int dim>
-IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p,
-			const std::vector<double>& rates)
-	:
-	BacteriumBase<dim>(p,rates),
-	time(0)
-{}
 
-template<int dim>
-IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p,
-			const std::vector<double>& rates,
-			double t)
-	:
-	BacteriumBase<dim>(p,rates),
-	time(t)
-{}
 
-template<int dim>
-std::unique_ptr<BacteriumBase<dim> > 
-IC_Bacterium<dim>::clone() const
-{
-	return std::unique_ptr<BacteriumBase<dim> >(
-		new IC_Bacterium(this->location,this->secretion_rates,time));
-}
+
+
+
+
+
+
+
+
+
+
+
+// // ------------------------------------------------------------------------------
+// // IC-AS BACTERIA
+// // ------------------------------------------------------------------------------
+
+// template<int dim>
+// class IC_Bacterium : public BacteriumBase<dim>{
+// 	IC_Bacterium();
+// 	IC_Bacterium(const Point<dim>& p);
+// 	IC_Bacterium(const std::vector<double>& rates);
+// 	IC_Bacterium(const Point<dim>& p,
+// 				const std::vector<double>& rates);
+// 	IC_Bacterium(const Point<dim>& p,
+// 				const std::vector<double>& rates,
+// 				double t);
+// 	// 	BacteriumBase(const Point<dim>& p);
+// 	// BacteriumBase(const std::vector<double>& rates);
+// 	// BacteriumBase(const Point<dim>& p, 
+// 	// 				const std::vector<double>& rates);
+
+
+// 	// VIRTUAL METHODS:
+// 	// virtual since can be overridden by chemotaxis for example
+// 	// virtual void randomStep(double time_step, 
+// 	// 					double diffusion_constant,
+// 	// 					const Geometry<dim>& geo,
+// 	// 					const Velocity::AdvectionHandler<dim>& velocity);  // same as base
+
+// 	// virtual double getFitness(const FitnessBase<dim>& fitness_function) const; 
+// //TODO:		// modify???
+// 	std::unique_ptr<BacteriumBase<dim> > clone() const override;
+
+// protected:
+// 	double time;
+// };
+
+// // IMPL
+// // ---------------------------------------------------------------------
+// template<int dim>
+// IC_Bacterium<dim>::IC_Bacterium()
+// 	:
+// 	BacteriumBase<dim>(),
+// 	time(0)
+// {}
+
+// template<int dim>
+// IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p)
+// 	:
+// 	BacteriumBase<dim>(p),
+// 	time(0)
+// {}
+
+// template<int dim>
+// IC_Bacterium<dim>::IC_Bacterium(const std::vector<double>& rates)
+// 	:
+// 	BacteriumBase<dim>(rates),
+// 	time(0)
+// {}
+
+// template<int dim>
+// IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p,
+// 			const std::vector<double>& rates)
+// 	:
+// 	BacteriumBase<dim>(p,rates),
+// 	time(0)
+// {}
+
+// template<int dim>
+// IC_Bacterium<dim>::IC_Bacterium(const Point<dim>& p,
+// 			const std::vector<double>& rates,
+// 			double t)
+// 	:
+// 	BacteriumBase<dim>(p,rates),
+// 	time(t)
+// {}
+
+// template<int dim>
+// std::unique_ptr<BacteriumBase<dim> > 
+// IC_Bacterium<dim>::clone() const
+// {
+// 	return std::unique_ptr<BacteriumBase<dim> >(
+// 		new IC_Bacterium(this->location,this->secretion_rates,time));
+// }
 
 
 }} // CLOSE NAMESPACES

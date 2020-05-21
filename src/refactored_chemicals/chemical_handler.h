@@ -1,5 +1,4 @@
-#ifndef MICROBE_SIMULATOR_REFACTORED_CHEMICAL_HANDLER_H
-#define MICROBE_SIMULATOR_REFACTORED_CHEMICAL_HANDLER_H
+#pragma once
 
 // #include <deal.II/base/timer.h>
 
@@ -305,4 +304,4 @@ ChemicalHandler<dim>::printInfo(std::ostream& out) const
 }
 
 }} // CLOSE NAMESPACE
-#endif
+/* chemical_handler.h */
