@@ -4,9 +4,9 @@
 #include <deal.II/grid/tria.h>
 using dealii::Triangulation;
 
-#include "../bacteria/bacteria_handler.h"
+// #include "../bacteria/bacteria_handler.h"
 
-// #include "../bacteria/bacteria.h"
+#include "../bacteria/bacteria.h"
 
 #include "../bacteria/bacteria_fitness.h"
 #include "../advection/advection_handler.h"
@@ -68,10 +68,10 @@ private:
 	RefactoredChemicals::ChemicalHandler<dim> chemicals;
 	RefactoredChemicals::Controls<dim>			control_functions;
 
-	Bacteria::BacteriaHandler<dim>			bacteria;
+	// Bacteria::BacteriaHandler<dim>			bacteria;
 	Bacteria::TestNewFitness::Fitness_Function<dim>	 fitness_function;
 
-	// BacteriaTools::Bacteria<dim>		test_new_bacteria;
+	BacteriaTools::Bacteria<dim>			bacteria; //test_new_bacteria;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;
@@ -336,6 +336,7 @@ Simulator<dim>::update_bacteria()
 	bacteria.move(bacteria_time_step, geometry, velocity_function);
 	bacteria.reproduce(bacteria_time_step, fitness_function);
 	bacteria.mutate(bacteria_time_step);
+	bacteria.update_state(bacteria_time_step, chemicals);
 }
 
 // OUTPUT:
@@ -611,7 +612,8 @@ Simulator<dim>::declare_parameters()
 	GeometryTools::GeometryBuilder<dim>::declare_parameters(prm);
 	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
 	Chemicals::Controls<dim>::declare_parameters(prm);
-	Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
+	// Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
+	BacteriaTools::Bacteria<dim>::declare_parameters(prm);
 	// Bacteria::Fitness::declare_parameters(prm);
 	Bacteria::TestNewFitness::Fitness_Function<dim>::declare_parameters(prm);
 }

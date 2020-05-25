@@ -57,6 +57,8 @@
 
 #include "../advection/velocity_interface.h"
 #include "../advection/stokes_solver.h"
+#include "../advection/advection_handler.h"
+
 #include "../utility/cell_iterator_map.h"
 #include "../utility/fe_tools.h"
 
