@@ -1,5 +1,4 @@
-#ifndef MICROBESIMULATOR_LINE_H
-#define MICROBESIMULATOR_LINE_H
+#pragma once
 
 #include <deal.II/base/point.h>
 using dealii::Point;
@@ -14,6 +13,7 @@ namespace MicrobeSimulator{
 /** @todo have obstacle base class */
 
 /** Line class for boundaries in 2D domain */
+template<int dim>
 class Line{
 public:
 	/** \brief Direction from line in which points are valid */
@@ -21,31 +21,31 @@ public:
 		ABOVE, BELOW
 	};
 
-	Line(const Point<2>& lft, const Point<2>& rgt);
-	Line(const Point<2>& lft, const Point<2>& rgt, Orientation ori);
+	Line(const Point<dim>& lft, const Point<dim>& rgt);
+	Line(const Point<dim>& lft, const Point<dim>& rgt, Orientation ori);
 
 	// accessors:
-	Point<2> getLeftPoint() const;
-	Point<2> getRightPoint() const;
+	Point<dim> getLeftPoint() const;
+	Point<dim> getRightPoint() const;
 	Orientation getOrientation() const;
 
 	// methods: (should maybe override virtual methods)
-	double distance_from_line(const Point<2>& p) const; 
+	double distance_from_line(const Point<dim>& p) const; 
 	// signed distance, return infinity if not orthogonal to line segment
 
-	bool is_in_bounds(const Point<2>& p, const double buffer=0) const;
+	bool is_in_bounds(const Point<dim>& p, const double buffer=0) const;
 	
-	Tensor<1, 2> getNormalVector(const Point<2>& p) const;
+	Tensor<1, dim> getNormalVector(const Point<dim>& p) const;
 	
-	void reflectPoint(const Point<2>& old_point, 
-				Point<2>& new_point, const double buffer=0.) const;
+	void reflectPoint(const Point<dim>& old_point, 
+				Point<dim>& new_point, const double buffer=0.) const;
 
 	void print(std::ostream& out) const;
 	void printInfo(std::ostream& out) const;
 
 private:
-	Point<2> left;
-	Point<2> right;
+	Point<dim> left;
+	Point<dim> right;
 
 	Orientation	orientation;
 
@@ -56,7 +56,7 @@ private:
 	// slope of any line perpendicular to this
 	double perpendicular_slope;
 
-	Tensor<1, 2> normal; // pointed towards interior
+	Tensor<1, dim> normal; // pointed towards interior
 
 	// for infinity, use:
 	// std::numeric_limits<double>::infinity()
@@ -65,9 +65,9 @@ private:
 	void init();
 
 	// orthogonal projection of point onto line:
-	Point<2> getProjectedPoint(const Point<2>& p) const;
-	double getRelativePosition(const Point<2>& p) const; // return inf if off line, otherwise +-1
-	bool isOffLine(const Point<2>& p) const;
+	Point<dim> getProjectedPoint(const Point<dim>& p) const;
+	double getRelativePosition(const Point<dim>& p) const; // return inf if off line, otherwise +-1
+	bool isOffLine(const Point<dim>& p) const;
 
 };
 
@@ -75,7 +75,8 @@ private:
 // ----------------------------------------------------------------
 
 /** \brief Constructor from points, default orientation is above */
-Line::Line(const Point<2>& lft, const Point<2>& rgt)
+template<int dim>
+Line<dim>::Line(const Point<dim>& lft, const Point<dim>& rgt)
 	:
 	left(lft),
 	right(rgt),
@@ -85,7 +86,8 @@ Line::Line(const Point<2>& lft, const Point<2>& rgt)
 }
 
 /** \brief Constructor from points and given orientation */
-Line::Line(const Point<2>& lft, const Point<2>& rgt, Orientation ori)
+template<int dim>
+Line<dim>::Line(const Point<dim>& lft, const Point<dim>& rgt, Orientation ori)
 	:
 	left(lft),
 	right(rgt),
@@ -95,8 +97,9 @@ Line::Line(const Point<2>& lft, const Point<2>& rgt, Orientation ori)
 }
 
 /** \brief Set local values of line slope and slope of perpendicular line */
+template<int dim>
 void
-Line::init()
+Line<dim>::init()
 {
 	// 1) check left < right
 	if( left[0] > (right[0] + 1e-14) )
@@ -166,20 +169,23 @@ Line::init()
 }
 
 // accessors:
-Point<2> 
-Line::getLeftPoint() const
+template<int dim>
+Point<dim> 
+Line<dim>::getLeftPoint() const
 {
 	return left;
 }
 
-Point<2> 
-Line::getRightPoint() const
+template<int dim>
+Point<dim> 
+Line<dim>::getRightPoint() const
 {
 	return right;
 }
 
-Line::Orientation 
-Line::getOrientation() const
+template<int dim>
+typename Line<dim>::Orientation 
+Line<dim>::getOrientation() const
 {
 	return orientation;
 }
@@ -187,16 +193,17 @@ Line::getOrientation() const
 // helper methods:
 
 /** \brief Return orthogonal projection of point on line */
-Point<2> 
-Line::getProjectedPoint(const Point<2>& p) const
+template<int dim>
+Point<dim> 
+Line<dim>::getProjectedPoint(const Point<dim>& p) const
 {
 	// if zero slope, projected point is x component:
 	if( std::fabs(slope) < 1e-8)
-		return Point<2>(p[0], left[1]); // left[1] == right[1]
+		return Point<dim>(p[0], left[1]); // left[1] == right[1]
 
 	// if slope infinite, projected point is y component:
 	if( std::isinf(slope) )
-		return Point<2>(left[0], p[1]); // left[0] == right[0]
+		return Point<dim>(left[0], p[1]); // left[0] == right[0]
 
 	// given perpendicular line, find intercept for eqn:
 	const double b = p[1] - perpendicular_slope*p[0]; // unless slope is inf...
@@ -205,15 +212,16 @@ Line::getProjectedPoint(const Point<2>& p) const
 	const double x = (intercept - b)/(perpendicular_slope - slope); 
 	const double y = slope*x + intercept;
 
-	return Point<2>(x,y);
+	return Point<dim>(x,y);
 }
 
 /** \brief Return +1 if above line segment, -1 if below, and infinity if off line */
 /** could also return 0 if on line */
+template<int dim>
 double 
-Line::getRelativePosition(const Point<2>& p) const
+Line<dim>::getRelativePosition(const Point<dim>& p) const
 {
-	const Point<2> projected = getProjectedPoint(p);
+	const Point<dim> projected = getProjectedPoint(p);
 
 	if(isOffLine(projected))
 		return std::numeric_limits<double>::infinity();
@@ -223,8 +231,8 @@ Line::getRelativePosition(const Point<2>& p) const
 		return 0; 
 
 	// get vectors and return cross product sign
-	const Tensor<1, 2> line = right - left;
-	const Tensor<1, 2> point = p - projected;
+	const Tensor<1, dim> line = right - left;
+	const Tensor<1, dim> point = p - projected;
 	// z component of cross product (line x point):
 	const double sign = ( ((line[0]*point[1] - line[1]*point[0]) > 0) ? 1.0 : -1.0 );
 
@@ -235,8 +243,9 @@ Line::getRelativePosition(const Point<2>& p) const
 }
 
 /** \brief Return true if point is not in orthogonal sweep of line segment */
+template<int dim>
 bool
-Line::isOffLine(const Point<2>& p) const
+Line<dim>::isOffLine(const Point<dim>& p) const
 {
 	// check if given point lies between left and right endpoints
 	// given point is already projected onto the line, 
@@ -258,8 +267,9 @@ Line::isOffLine(const Point<2>& p) const
 // methods:
 
 /** \brief Normal distance from line to given point */
+template<int dim>
 double 
-Line::distance_from_line(const Point<2>& p) const 
+Line<dim>::distance_from_line(const Point<dim>& p) const 
 {
 	const double rel_pos = getRelativePosition(p);
 	if( std::isinf(rel_pos) )
@@ -269,8 +279,9 @@ Line::distance_from_line(const Point<2>& p) const
 }
 
 /** \brief Return whether or not given point is on valid side of line */
+template<int dim>
 bool 
-Line::is_in_bounds(const Point<2>& p, const double buffer) const
+Line<dim>::is_in_bounds(const Point<dim>& p, const double buffer) const
 {
 	const double dist = distance_from_line(p);
 	// is in bounds relative to this line if dist is infinite, 
@@ -286,12 +297,13 @@ Line::is_in_bounds(const Point<2>& p, const double buffer) const
 
 // /** \brief Return unit vector normal to line in direction of given point,
 // *  with sign given from orientation */
-Tensor<1, 2> 
-Line::getNormalVector(const Point<2>& /*p*/) const
+template<int dim>
+Tensor<1, dim> 
+Line<dim>::getNormalVector(const Point<dim>& /*p*/) const
 {
 	return normal;
 }
-// 	Tensor<1, 2> normal;
+// 	Tensor<1, dim> normal;
 // 	const double rel_pos = getRelativePosition(p);
 
 // 	// use perpendicular slope:
@@ -313,7 +325,7 @@ Line::getNormalVector(const Point<2>& /*p*/) const
 // 		}
 // 		normal[0] = 1;
 // 		normal[1] = 0;
-// 		return rel_pos*normal; //Tensor<1, 2>(1, 0);
+// 		return rel_pos*normal; //Tensor<1, dim>(1, 0);
 // 	}
 
 // 	// if zero:
@@ -325,21 +337,21 @@ Line::getNormalVector(const Point<2>& /*p*/) const
 // 			{
 // 				normal[0] = 0;
 // 				normal[1] = -1;
-// 				return normal; //Tensor<1, 2>(0, -1);
+// 				return normal; //Tensor<1, dim>(0, -1);
 // 			}
 // 			normal[0] = 0;
 // 			normal[1] = 1;
-// 			return normal; //Tensor<1, 2>(0, 1);
+// 			return normal; //Tensor<1, dim>(0, 1);
 // 		}
 // 		normal[0] = 0;
 // 		normal[1] = 1;
-// 		return rel_pos*normal; //Tensor<1, 2>(0, 1);
+// 		return rel_pos*normal; //Tensor<1, dim>(0, 1);
 // 	}
 
 // 	// else finite:
 // 	// y = mx + b, b doesnt matter here
 // 	// use x = 1, so y = perpendicular_slope
-// 	// Tensor<1, 2> normal; //(1, perpendicular_slope);
+// 	// Tensor<1, dim> normal; //(1, perpendicular_slope);
 // 	normal[0] = 1;
 // 	normal[1] = perpendicular_slope;
 // 	normal /= normal.norm(); // normalize
@@ -377,9 +389,10 @@ Line::getNormalVector(const Point<2>& /*p*/) const
 // } // getNormalVector()
 
 /** \brief Reflect point from line */
+template<int dim>
 void 
-Line::reflectPoint(const Point<2>& /* old_point */, 
-			Point<2>& new_point, const double buffer) const
+Line<dim>::reflectPoint(const Point<dim>& /* old_point */, 
+			Point<dim>& new_point, const double buffer) const
 {
 	// assuming already checked that old point and new point 
 	// are on different sides of the line
@@ -390,7 +403,7 @@ Line::reflectPoint(const Point<2>& /* old_point */,
 	// 	std::cout << "old_point: " << old_point << " try: " << new_point << std::endl;
 
 	const double delta = distance_from_line(new_point) - buffer; // should be negative
-	// Tensor<1, 2> normal = getNormalVector(new_point); // should be in direction of old_point
+	// Tensor<1, dim> normal = getNormalVector(new_point); // should be in direction of old_point
 	new_point = new_point - 2.0*delta*normal;
 
 	// if(slope != 0)
@@ -405,8 +418,9 @@ Line::reflectPoint(const Point<2>& /* old_point */,
 }
 
 /** \brief Print line end points and orientation */
+template<int dim>
 void
-Line::print(std::ostream& out) const
+Line<dim>::print(std::ostream& out) const
 {
 	const std::string ori_str = 
 		( (orientation==ABOVE) ? "ABOVE" : "BELOW" );
@@ -415,8 +429,9 @@ Line::print(std::ostream& out) const
 }
 
 /** \brief Print detailed line info */
+template<int dim>
 void
-Line::printInfo(std::ostream& out) const
+Line<dim>::printInfo(std::ostream& out) const
 {
 	const std::string ori_str = 
 		( (orientation==ABOVE) ? "ABOVE" : "BELOW" );
@@ -436,4 +451,4 @@ Line::printInfo(std::ostream& out) const
 }
 
 } // CLOSE NAMESPACE
-#endif
+/* line.h */

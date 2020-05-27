@@ -86,7 +86,7 @@ public:
 	HyperRectangle<dim> getRectangleAt(unsigned int i) const;
 
 	// line accessors:
-	std::vector<Line> getLines() const;
+	std::vector<Line<dim> > getLines() const;
 	unsigned int getNumberLines() const;
 
 	// mutators: (used by builder to constuct geometry)
@@ -98,7 +98,7 @@ public:
 	
 	void addSphere(const Sphere<dim>& sp);
 	void addRectangle(const HyperRectangle<dim>& rect);
-	void addLine(const Line& line);
+	void addLine(const Line<dim>& line);
 
 	// HANDLING BOUNDARIES:
 	void checkBoundaries(const Point<dim>& oldPoint, 
@@ -129,7 +129,7 @@ private:
 	std::vector<HyperRectangle<dim> > rectangles;
 
 	// bounding lines:
-	std::vector<Line> lines;
+	std::vector<Line<dim> > lines;
 }; // class Geometry{}
 
 
@@ -242,7 +242,7 @@ Geometry<dim>::getRectangleAt(unsigned int i) const
 // line accessors:
 /** \brief Return vector of lines in geometry */
 template<int dim>
-std::vector<Line> 
+std::vector<Line<dim> > 
 Geometry<dim>::getLines() const
 {
 	return lines;
@@ -310,7 +310,7 @@ Geometry<dim>::addRectangle(const HyperRectangle<dim>& rect)
 /** \brief Add line to geometry */
 template<int dim>
 void
-Geometry<dim>::addLine(const Line& line)
+Geometry<dim>::addLine(const Line<dim>& line)
 {
 	lines.emplace_back(line);
 }

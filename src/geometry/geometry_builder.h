@@ -1,5 +1,4 @@
-#ifndef MICROBESIMULATOR_GEOMETRY_BUILDER_H
-#define MICROBESIMULATOR_GEOMETRY_BUILDER_H
+#pragma once
 
 #include <deal.II/grid/tria.h>
 #include <deal.II/base/point.h>
@@ -300,7 +299,7 @@ template<int dim>
 void 
 BuilderBase<dim>::set_line_boundary_ids(const Geometry<dim>& geo, Triangulation<dim>& tria)
 {
-	const std::vector<Line> lines = geo.getLines();
+	const std::vector<Line<dim> > lines = geo.getLines();
 	const double edge_tolerance = 1e-8;
 
 	for (typename Triangulation<dim>::active_cell_iterator
@@ -1781,12 +1780,12 @@ Funnel<dim>::set_funnel_geo_lines(Geometry<dim>& geo) const
 	// bottom line:
 	left_start[1] = 0; // y coordinate
 	right_end[1] = half_difference;
-	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 
 	// top line:
 	left_start[1] = left_height;
 	right_end[1] = half_difference + right_height;
-	geo.addLine(Line(left_start, right_end, Line::BELOW));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 
 	// end lines:
 	// ---------------------------
@@ -1796,12 +1795,12 @@ Funnel<dim>::set_funnel_geo_lines(Geometry<dim>& geo) const
 	// bottom line:
 	left_start[1] = half_difference;
 	right_end[1] = half_difference;
-	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 
 	// top line:
 	left_start[1] = half_difference + right_height; 
 	right_end[1] = half_difference + right_height;
-	geo.addLine(Line(left_start, right_end, Line::BELOW));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 }
 
 template<int dim>
@@ -2127,12 +2126,12 @@ BowTie<dim>::set_extra_bowtie_lines(Geometry<dim>& geo) const
 	//bottom line:
 	left_start[1] = half_difference;
 	right_end[1] = 0.;
-	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 	
 	// top line:	
 	left_start[1] = half_difference + right_height;
 	right_end[1] = left_height;
-	geo.addLine(Line(left_start, right_end, Line::BELOW));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 }
 
 /** \brief Build base grid for BowTie geometry */
@@ -2417,13 +2416,13 @@ FanOut<dim>::addRectangles(Geometry<dim>& geo) const
 	top_right[1] = 0.5*height - channel_thickness - 0.5*wall_thickness;
 	bottom_left[1] = top_right[1]; // - wall_thickness;
 	// geo.addRectangle(HyperRectangle<dim>(bottom_left,top_right));
-	geo.addLine(Line(bottom_left,top_right,Line::ABOVE));
+	geo.addLine(Line<dim>(bottom_left,top_right,Line<dim>::ABOVE));
 
 	// top rectangle:
 	bottom_left[1] = 0.5*height + channel_thickness + 0.5*wall_thickness;
 	top_right[1] = bottom_left[1]; // + wall_thickness;
 	// geo.addRectangle(HyperRectangle<dim>(bottom_left,top_right));
-	geo.addLine(Line(bottom_left,top_right,Line::BELOW));
+	geo.addLine(Line<dim>(bottom_left,top_right,Line<dim>::BELOW));
 
 	for(unsigned int i = 2; i <= n_sections; ++i)
 	{
@@ -2508,7 +2507,7 @@ FanOut<dim>::addCapLines(Geometry<dim>& geo, unsigned int i) const
 		upper[0] = lower[0] + section_length;
 		lower[1] = bottom_y; // - wall_thickness;
 		upper[1] = lower[1]; // + wall_thickness;
-		geo.addLine(Line(lower,upper,Line::ABOVE));
+		geo.addLine(Line<dim>(lower,upper,Line<dim>::ABOVE));
 	} // no need for final rectangles
 
 	// bottom cap:
@@ -2516,7 +2515,7 @@ FanOut<dim>::addCapLines(Geometry<dim>& geo, unsigned int i) const
 	upper[0] = x_left;
 	lower[1] = bottom_y; // - wall_thickness;
 	upper[1] = lower[1] + cap_height;
-	geo.addLine(Line(lower,upper,Line::BELOW));
+	geo.addLine(Line<dim>(lower,upper,Line<dim>::BELOW));
 
 	if(i != n_sections)
 	{
@@ -2525,7 +2524,7 @@ FanOut<dim>::addCapLines(Geometry<dim>& geo, unsigned int i) const
 		upper[0] = lower[0] + section_length;
 		lower[1] = bottom_y + section_height;
 		upper[1] = lower[1]; // + wall_thickness;
-		geo.addLine(Line(lower,upper,Line::BELOW));
+		geo.addLine(Line<dim>(lower,upper,Line<dim>::BELOW));
 	} // no need for final rectangles
 
 	// top cap:
@@ -2533,7 +2532,7 @@ FanOut<dim>::addCapLines(Geometry<dim>& geo, unsigned int i) const
 	upper[0] = x_left;
 	upper[1] = bottom_y + section_height; // + wall_thickness;
 	lower[1] = upper[1] - cap_height;
-	geo.addLine(Line(lower,upper,Line::BELOW));
+	geo.addLine(Line<dim>(lower,upper,Line<dim>::BELOW));
 }
 
 template<int dim>
@@ -2897,12 +2896,12 @@ FanIn<dim>::addFunnelLines(Geometry<dim>& geo) const
 	// bottom line:
 	left_start[1] = 0; // y coordinate
 	right_end[1] = 0.5*height - channel_thickness;
-	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 
 	// top line:
 	left_start[1] = height;
 	right_end[1] = 0.5*height + channel_thickness;
-	geo.addLine(Line(left_start, right_end, Line::BELOW));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 }
 
 template<int dim>
@@ -2917,12 +2916,12 @@ FanIn<dim>::addTopBottomLines(Geometry<dim>& geo) const
 	// bottom line:
 	left_start[1] =  0.5*height - channel_thickness;
 	right_end[1] = left_start[1];
-	geo.addLine(Line(left_start, right_end, Line::ABOVE));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 
 	// top line:
 	left_start[1] =0.5*height + channel_thickness; 
 	right_end[1] = left_start[1];
-	geo.addLine(Line(left_start, right_end, Line::BELOW));
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 }
 
 template<int dim>
@@ -3820,21 +3819,21 @@ GeometryBuilder<dim>::tile_geometry(Geometry<dim>& geo) const
 	}
 
 	// lines: (for 2d only)
-	std::vector<Line> lines = geo.getLines();
+	std::vector<Line<dim> > lines = geo.getLines();
 	for(unsigned int i = 0; i < lines.size(); ++i)
 	{
 		for(unsigned int tile = 1; tile < n_tiles; ++tile)
 		{
 			// get info:
-			Point<2> left = lines[i].getLeftPoint();
-			Point<2> right = lines[i].getRightPoint();
-			Line::Orientation ori = lines[i].getOrientation();
+			Point<dim> left = lines[i].getLeftPoint();
+			Point<dim> right = lines[i].getRightPoint();
+			typename Line<dim>::Orientation ori = lines[i].getOrientation();
 
 			// shift:
 			left[0] = left[0] + tile*width;
 			right[0] = right[0] + tile*width;
 
-			geo.addLine(Line(left,right,ori));
+			geo.addLine(Line<dim>(left,right,ori));
 		}
 	}
 }
@@ -3895,4 +3894,4 @@ GeometryBuilder<dim>::printInfo(std::ostream& out) const
 }
 
 }} // close namespace
-#endif
+/* geometry_builder.h */

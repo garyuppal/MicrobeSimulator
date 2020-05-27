@@ -67,6 +67,11 @@ int main(int argc, char** argv)
 			// sim.test_mesh();
 			// sim.test_random_walk_boundaries();
 		}
+		else if(cmd_prm.getDimension() == 1)
+		{
+			Simulation::Simulator<1> sim(cmd_prm);
+			sim.run_aging();
+		}
 		else if(cmd_prm.getDimension() == 3)
 		{
 			std::cout << "Still need to implement some things for 3D" << std::endl;
