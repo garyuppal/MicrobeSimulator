@@ -2,6 +2,7 @@
 // #include "src/simulators/full_simulator.h"
 
 #include "src/simulators/simulator.h"
+#include "src/simulators/aging_simulator.h"
 
 #include <list>
 #include <fstream>
@@ -69,8 +70,8 @@ int main(int argc, char** argv)
 		}
 		else if(cmd_prm.getDimension() == 1)
 		{
-			Simulation::Simulator<1> sim(cmd_prm);
-			sim.run_aging();
+			Aging::Simulator<1> sim(cmd_prm);
+			sim.run();
 		}
 		else if(cmd_prm.getDimension() == 3)
 		{

@@ -87,7 +87,7 @@ public:
 	void mutate(double dt);
 
 	// legacy: (remove)
-	void reproduce(double dt, const FitnessBase<dim>& fitness_function); 
+	// void reproduce(double dt, const FitnessBase<dim>& fitness_function); 
 	
 	// using new chemical handler and fitness handler:
 	void reproduce(double dt, const TestNewFitness::Fitness_Function<dim>& fitness_function); 
@@ -366,43 +366,43 @@ BacteriaHandler<dim>::remove_and_capture_fallen_bacteria(
 // LEGACY.... REMOVE
 /** \brief Reproduce bacteria according to supplied fitness function and time step */
 /** @todo Can probably speed up */
-template<int dim>
-void 
-BacteriaHandler<dim>::reproduce(
-	double dt, const FitnessBase<dim>& fitness_function)
-{
-// simple implementaiton to get working, speed up later:
-// instead of recloning, and for future improvement, can we move the pointer instead? (there should be  a move function for unique_ptr)
-	std::vector<std::unique_ptr<BacteriumBase<dim> > > offspring;
+// template<int dim>
+// void 
+// BacteriaHandler<dim>::reproduce(
+// 	double dt, const FitnessBase<dim>& fitness_function)
+// {
+// // simple implementaiton to get working, speed up later:
+// // instead of recloning, and for future improvement, can we move the pointer instead? (there should be  a move function for unique_ptr)
+// 	std::vector<std::unique_ptr<BacteriumBase<dim> > > offspring;
 
-	for(auto it = bacteria.begin(); it != bacteria.end(); )
-	{
-		const double fit = (*it)->getFitness(fitness_function)*dt; 
-		if(fit < 0)
-		{
-			double prob = Utility::getRand();
-			if(prob < (-fit) )
-			{
-				it = bacteria.erase(it);
-			}
-			else
-				++it;
-		} // if possibly dying
-		else
-		{
-			double prob = Utility::getRand();
-			if(prob < fit)
-			{
-				offspring.emplace_back( (*it)->clone() );
-			}
-			++it;
-		} // else possibly reproduce
-	} // for all bacteria
+// 	for(auto it = bacteria.begin(); it != bacteria.end(); )
+// 	{
+// 		const double fit = (*it)->getFitness(fitness_function)*dt; 
+// 		if(fit < 0)
+// 		{
+// 			double prob = Utility::getRand();
+// 			if(prob < (-fit) )
+// 			{
+// 				it = bacteria.erase(it);
+// 			}
+// 			else
+// 				++it;
+// 		} // if possibly dying
+// 		else
+// 		{
+// 			double prob = Utility::getRand();
+// 			if(prob < fit)
+// 			{
+// 				offspring.emplace_back( (*it)->clone() );
+// 			}
+// 			++it;
+// 		} // else possibly reproduce
+// 	} // for all bacteria
 
-	// add offspring to end: 
-	for(unsigned int i = 0; i < offspring.size(); ++i)
-		bacteria.emplace_back( offspring[i]->clone() );
-} // reproduce()
+// 	// add offspring to end: 
+// 	for(unsigned int i = 0; i < offspring.size(); ++i)
+// 		bacteria.emplace_back( offspring[i]->clone() );
+// } // reproduce()
 
 /** \brief Reproduce bacteria according to supplied fitness function and time step */
 // USING NEW CHEM AND FITNESS:

@@ -56,10 +56,6 @@ public:
 	// or create simulator interface and separate classes...
 	void run();
 
-	// aging simulation:
-	void run_aging(); // using 1-d chemical, but able to consume resource
-			// add this as a new type, but still have chemical handler interface
-
 	void run_convergence_check();
 	void test_mesh();
 	void test_random_walk_boundaries();
@@ -70,7 +66,7 @@ private:
 	Geometry<dim> 							geometry;
 	Velocity::AdvectionHandler<dim>			velocity_function;
 
-	RefactoredChemicals::ChemicalHandler<dim> chemicals;
+	RefactoredChemicals::ChemicalHandler<dim> 	chemicals;
 	RefactoredChemicals::Controls<dim>			control_functions;
 
 	// Bacteria::BacteriaHandler<dim>			bacteria;
@@ -157,15 +153,6 @@ Simulator<dim>::run()
 	setup_parameters();
 	setup_system();
 	run_microbes();
-}
-
-template<int dim>
-void
-Simulator<dim>::run_aging()
-{
-	// setup_parameters();
-	// setup_system();
-	// run_microbes();
 }
 
 template<int dim>
@@ -624,8 +611,8 @@ Simulator<dim>::declare_parameters()
 	// declare class based parameters:
 	Velocity::AdvectionHandler<dim>::declare_parameters(prm);
 	GeometryTools::GeometryBuilder<dim>::declare_parameters(prm);
-	Chemicals::ChemicalHandler<dim>::declare_parameters(prm);
-	Chemicals::Controls<dim>::declare_parameters(prm);
+	RefactoredChemicals::ChemicalHandler<dim>::declare_parameters(prm);
+	RefactoredChemicals::Controls<dim>::declare_parameters(prm);
 	// Bacteria::BacteriaHandler<dim>::declare_parameters(prm);
 	BacteriaTools::Bacteria<dim>::declare_parameters(prm);
 	// Bacteria::Fitness::declare_parameters(prm);
