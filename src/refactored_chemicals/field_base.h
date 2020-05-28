@@ -51,6 +51,7 @@ public:
 
 	// read only direct access:
 	const T& operator[](unsigned int i) const;
+	T& operator[](unsigned int i);
 
 	unsigned int getSize() const;
 
@@ -193,6 +194,13 @@ FieldBase<dim, T>::getSize() const
 template<int dim, class T>
 const T& 
 FieldBase<dim, T>::operator[](unsigned int i) const
+{
+	return field[i];
+}
+
+template<int dim, class T>
+T& 
+FieldBase<dim, T>::operator[](unsigned int i)
 {
 	return field[i];
 }

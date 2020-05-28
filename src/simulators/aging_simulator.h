@@ -5,6 +5,7 @@
 
 #include "../aging/chemicals.h"
 #include "../aging/cells.h"
+#include "../aging/fitness.h"
 
 namespace MicrobeSimulator{ 
 	/** \brief Namespace for aging simulations */
@@ -24,6 +25,7 @@ private:
 
 	Aging::Chemicals<dim>	chemicals;
 	Aging::Cells<dim>		cells;
+	Aging::Fitness<dim>		fitness;
 
 	// SYSTEM CONSTANTS:
 	std::string 							output_directory;
@@ -33,6 +35,7 @@ private:
 	double 									save_period;
 	unsigned int 							save_step_number;
 	unsigned int 							time_step_number;
+	double 									source_strength;
 
 	// update:
 	void update_chemicals();
@@ -49,6 +52,7 @@ private:
 	void assign_local_parameters();
 	void setup_chemicals();
 	void setup_cells();
+	void setup_fitness();
 };
 
 // IMPL
@@ -63,7 +67,8 @@ Simulator<dim>::Simulator(const CommandLineParameters& cmd_prm)
 	time(0),
 	time_step(1),
 	save_step_number(0),
-	time_step_number(0)
+	time_step_number(0),
+	source_strength(0)
 {}
 
 template<int dim>
@@ -110,12 +115,24 @@ Simulator<dim>::run()
 template<int dim>
 void 
 Simulator<dim>::update_chemicals()
-{}
+{
+	// sinks given by cell locations,
+	// soruces are constant and depend on mixing parameter
+	std::vector<Point<dim> > source_locations = {Point<dim>()};
+	std::vector<double> sources(source_locations.size(), source_strength);
+
+	std::vector<Point<dim> > sink_locations = cells.getLocations();
+	std::vector<double> sinks(sink_locations.size(), cells.getConsumptionRate());
+
+	chemicals.update(source_locations, sources, sink_locations, sinks);
+}
 
 template<int dim>
 void 
 Simulator<dim>::update_cells()
-{}
+{
+	cells.update(time_step, fitness);
+}
 
 // ---------------------------------------------------------------------------------
 // OUTPUT
@@ -124,12 +141,7 @@ template<int dim>
 void
 Simulator<dim>::output_chemicals() const
 {
-	// std::string outfile = output_directory
-	// 					+ "/cells_"
-	// 					+ dealii::Utilities::int_to_string(save_step_number,4)
-	// 					+ ".dat";
-	// std::ofstream out(outfile);
-	// chemicals.print(out);
+	chemicals.output(output_directory, save_step_number);
 }
 
 template<int dim>
@@ -184,6 +196,7 @@ Simulator<dim>::assign_local_parameters()
 	run_time = prm.get_double("Run time");
 	time_step = prm.get_double("Time step");
 	save_period = prm.get_double("Save period");
+	source_strength = prm.get_double("Source strength");
 }
 
 template<int dim>
@@ -191,7 +204,7 @@ void
 Simulator<dim>::setup_chemicals()
 {
 	std::cout << "...setting up chemicals" << std::endl;
-	chemicals.init(prm);
+	chemicals.init(prm, time_step);
 	chemicals.printInfo(std::cout);
 }
 
@@ -205,15 +218,26 @@ Simulator<dim>::setup_cells()
 }
 
 template<int dim>
+void
+Simulator<dim>::setup_fitness()
+{
+	std::cout << "...setting up fitness" << std::endl;
+	fitness.init(prm, chemicals);
+	fitness.printInfo(std::cout);	
+}
+
+template<int dim>
 void 
 Simulator<dim>::declare_parameters()
 {
 	prm.declare_entry("Time step", "1", Patterns::Double());
 	prm.declare_entry("Run time","0",Patterns::Double());
 	prm.declare_entry("Save period","1",Patterns::Double());
+	prm.declare_entry("Source strength","0",Patterns::Double());
 
 	Aging::Chemicals<dim>::declare_parameters(prm);
 	Aging::Cells<dim>::declare_parameters(prm);
+	Aging::Fitness<dim>::declare_parameters(prm);
 }
 
 }} // CLOSE NAMESPACES

@@ -14,49 +14,11 @@
 #include "line.h"
 
 #include "../utility/parameter_handler.h"
+#include "../utility/utility.h"
 
 
 namespace MicrobeSimulator{
 
-	/** \brief Enum type for boundary conditions */
-	enum class BoundaryCondition : int
-	{
-		WRAP = 0, REFLECT = 1, OPEN = 2 
-	}; 
-
-	/** \brief Convert boundary condition type to string */
-	std::string getBoundaryConditionString(BoundaryCondition bc)
-	{
-		std::string result = "";
-		if(bc == BoundaryCondition::WRAP)
-			result = "Periodic";
-		else if(bc == BoundaryCondition::REFLECT)
-			result = "Neumann";
-		else if(bc == BoundaryCondition::OPEN)
-			result = "Open";
-		else
-			result = "ERROR";
-
-		return result;
-	}
-
-	/** \brief Convert a valid string to enum boundary condition type */
-	BoundaryCondition stringToBoundaryCondition(std::string value)
-	{
-		if( boost::iequals(value, "WRAP") )
-			return BoundaryCondition::WRAP;
-		else if( boost::iequals(value, "REFLECT") )
-			return BoundaryCondition::REFLECT;
-		else if( boost::iequals(value, "OPEN") )
-			return BoundaryCondition::OPEN;
-		else
-		{
-			std::string msg = "Invalid string! Could not convert <"
-							+ value
-							+ "> to boundary condition type.";
-			throw std::invalid_argument(msg.c_str());
-		}
-	}
 
 // GEOMETRY CLASS
 // ------------------------------------------------------------------------------------

@@ -282,12 +282,14 @@ public:
 
 	// list access:
 	std::vector<std::string> get_list(const std::string& entry) const;
+	std::vector<Point<1> > get_oneD_point_list(const std::string& entry) const; // generalize to n-d?
 	std::vector<Point<2> > get_point_list(const std::string& entry) const; // generalize to n-d?
 	std::vector<std::string> get_string_vector(const std::string& entry) const;
 	std::vector<double> get_double_vector(const std::string& entry) const;
 
 	// list access by section:
 	std::vector<std::string> get_list(const std::string& section, const std::string& entry) const;
+	std::vector<Point<1> > get_oneD_point_list(const std::string& section, const std::string& entry) const;
 	std::vector<Point<2> > get_point_list(const std::string& section, const std::string& entry) const;
 	std::vector<std::string> get_string_vector(const std::string& section, const std::string& entry) const;
 	std::vector<double> get_double_vector(const std::string& section, const std::string& entry) const;
@@ -723,6 +725,29 @@ std::vector<std::string> ParameterHandler::get_list(const std::string& entry) co
 	return Utility::split_string_list(get(entry), ",");
 }
 
+std::vector<Point<1> > ParameterHandler::get_oneD_point_list(const std::string& entry) const
+{
+	std::vector<std::string> locations = Utility::split_string_list(get(entry), "");
+	std::vector<Point<1> > points;
+
+	for(unsigned int i = 0; i < locations.size(); ++i)
+	{
+		if( !boost::iequals(locations[i],",") )
+		{
+			std::vector<std::string> numbers = Utility::split_string_list(locations[i],",");
+			if(numbers.size() == 1)
+			{
+				Point<1> p;
+				for(unsigned int i = 0; i < numbers.size(); ++i)
+					p[i] = std::stod(numbers[i]);
+				points.emplace_back(p);
+			}
+		} // if not empty token
+	} // for given points
+
+	return points;
+}
+
 std::vector<Point<2> > ParameterHandler::get_point_list(const std::string& entry) const
 {
 	std::vector<std::string> locations = Utility::split_string_list(get(entry), "");
@@ -769,6 +794,30 @@ std::vector<std::string> ParameterHandler::get_list(const std::string& section,
 		const std::string& entry) const
 {
 	return Utility::split_string_list(get(section, entry), ",");
+}
+
+std::vector<Point<1> > ParameterHandler::get_oneD_point_list(const std::string& section, 
+		const std::string& entry) const
+{
+	std::vector<std::string> locations = Utility::split_string_list(get(section, entry), "");
+	std::vector<Point<1> > points;
+
+	for(unsigned int i = 0; i < locations.size(); ++i)
+	{
+		if( !boost::iequals(locations[i],",") )
+		{
+			std::vector<std::string> numbers = Utility::split_string_list(locations[i],",");
+			if(numbers.size() == 1)
+			{
+				Point<1> p;
+				for(unsigned int i = 0; i < numbers.size(); ++i)
+					p[i] = std::stod(numbers[i]);
+				points.emplace_back(p);
+			}
+		} // if not empty token
+	} // for given points
+
+	return points;
 }
 
 std::vector<Point<2> > ParameterHandler::get_point_list(const std::string& section, 
