@@ -7,6 +7,14 @@
 #include "../aging/cells.h"
 #include "../aging/fitness.h"
 
+/** @file
+* @todo extend model with extra cooperative factors and death of source cells
+* @todo print out geometry for easier plotting/analysis
+* @todo integrate in with existing code, possibly add FEM methods, 
+*	may be faster with implicit solver
+*/
+
+
 namespace MicrobeSimulator{ 
 	/** \brief Namespace for aging simulations */
 	namespace Aging{
@@ -53,6 +61,8 @@ private:
 	void setup_chemicals();
 	void setup_cells();
 	void setup_fitness();
+
+	void printInfo(std::ostream& out) const;
 };
 
 // IMPL
@@ -106,6 +116,10 @@ Simulator<dim>::run()
 		// update time:
 		time += time_step;
 		++time_step_number;
+
+		if(!cells.isAlive())
+			std::cout << "Everyone died" << std::endl;
+
 	}while( (time < run_time) && cells.isAlive() );
 }
 
@@ -168,6 +182,7 @@ Simulator<dim>::setup()
 	setup_parameters();
 	setup_chemicals();
 	setup_cells();
+	setup_fitness();
 
 	std::cout << std::endl << std::endl;
 }
@@ -197,6 +212,8 @@ Simulator<dim>::assign_local_parameters()
 	time_step = prm.get_double("Time step");
 	save_period = prm.get_double("Save period");
 	source_strength = prm.get_double("Source strength");
+
+	printInfo(std::cout);
 }
 
 template<int dim>
@@ -238,6 +255,21 @@ Simulator<dim>::declare_parameters()
 	Aging::Chemicals<dim>::declare_parameters(prm);
 	Aging::Cells<dim>::declare_parameters(prm);
 	Aging::Fitness<dim>::declare_parameters(prm);
+}
+
+template<int dim>
+void 
+Simulator<dim>::printInfo(std::ostream& out) const
+{
+	out << "\n\n" << Utility::medium_line << std::endl 
+		<< "\t\t SIMULATION INFO:" << std::endl
+		<< Utility::medium_line << std::endl
+		<< "Time step: " << time_step << std::endl
+		<< "Run time: " << run_time << std::endl
+		<< "Save period: " << save_period << std::endl
+		<< "Source strength: " << source_strength << std::endl
+		<< std::endl << Utility::medium_line << std::endl
+		<< std::endl << std::endl;
 }
 
 }} // CLOSE NAMESPACES

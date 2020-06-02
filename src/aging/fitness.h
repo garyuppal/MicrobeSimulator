@@ -15,7 +15,7 @@ namespace MicrobeSimulator{ namespace Aging{
 template<int dim>
 class FitnessBase{
 public:
-	FitnessBase(const Aging::Chemicals<dim>& ch);
+	FitnessBase(const ParameterHandler& prm, const Aging::Chemicals<dim>& ch);
 	virtual ~FitnessBase() {}
 
 	virtual double value(const Point<dim>& location) const=0;
@@ -27,7 +27,8 @@ protected:
 };
 
 template<int dim>
-FitnessBase<dim>::FitnessBase(const Aging::Chemicals<dim>& ch)
+FitnessBase<dim>::FitnessBase(const ParameterHandler& /*prm*/,
+								 const Aging::Chemicals<dim>& ch)
 	:
 	chemicals(&ch)
 {}
@@ -55,7 +56,7 @@ CF_Fitness<dim>::CF_Fitness(const ParameterHandler& prm, const Aging::Chemicals<
 	:
 	FitnessBase<dim>(prm, ch)
 {
-	const std::string section = "CF";
+	const std::string section = "Fitness.CF";
 	death_rate = prm.get_double(section, "Death rate");
 	saturation_constant = prm.get_double(section, "Saturation constant");
 	hill_constant = prm.get_double(section, "Hill constant");
@@ -65,10 +66,12 @@ template<int dim>
 void 
 CF_Fitness<dim>::declare_parameters(ParameterHandler& prm)
 {
-	prm.enter_subsection("CF");
-		prm.declare_entry("Death rate", "0", Patterns::Double());
-		prm.declare_entry("Saturation constant", "1", Patterns::Double());
-		prm.declare_entry("Hill constant","1",Patterns::Double());
+	prm.enter_subsection("Fitness");
+		prm.enter_subsection("CF");
+			prm.declare_entry("Death rate", "0", Patterns::Double());
+			prm.declare_entry("Saturation constant", "1", Patterns::Double());
+			prm.declare_entry("Hill constant","1",Patterns::Double());
+		prm.leave_subsection();
 	prm.leave_subsection();
 }
 
@@ -78,7 +81,10 @@ CF_Fitness<dim>::value(const Point<dim>& location) const
 {
 	const double f = (*(this->chemicals))[0].value(location);
 
-	return -death_rate/(1. + std::pow( f/saturation_constant ,hill_constant) );
+	// const double rval = death_rate/(1. + std::pow( f/saturation_constant ,hill_constant) );
+	// std::cout << "chemical: " << f << " return: " << rval << std::endl;
+
+	return death_rate/(1. + std::pow( f/saturation_constant ,hill_constant) );
 }
 
 template<int dim>

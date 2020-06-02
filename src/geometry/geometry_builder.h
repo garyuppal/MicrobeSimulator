@@ -1998,21 +1998,310 @@ Funnel<dim>::printInfo(std::ostream& out) const
 }
 
 
+// // -------------------------------------------------------------------------------
+// // 		BOWTIE:
+// // -------------------------------------------------------------------------------
+// /** \brief Class to construct BowTie type geometry */
+// /** Inherits from Funnel, making use of most of the same methods, and just adding 
+// * geometry on right side.
+// */
+// template<int dim>
+// class BowTie : public Funnel<dim>{
+// public:
+// 	// constructor
+// 	BowTie(const ParameterHandler& prm);
+
+// 	// class parameters:
+// 	// static void declare_parameters(ParameterHandler& prm); 
+
+// 	// override virtual methods:
+// 	void build_geometry(Geometry<dim>& geo) const override; 
+// 	void build_grid_base(const Geometry<dim>& geo, Triangulation<dim>& tria) const override; 
+// 	void printInfo(std::ostream& out) const override;
+// private:
+
+// 	// inherited:
+// 	// double left_length;
+// 	// double center_length;
+// 	// double right_length;
+// 	// double left_height;
+// 	// double right_height;
+
+// 	const double& left_length;
+// 	const double& center_length;
+// 	const double& right_length;
+// 	const double& left_height;
+// 	const double& right_height;
+// 	const double& half_difference;
+
+// 	// void set_funnel_geo_lines(Geometry<dim>& geo) const;
+// 	void set_extra_bowtie_lines(Geometry<dim>& geo) const;
+
+// 	// inherited support methods:
+// 	// void build_left_side(Triangulation<dim>& tria) const;
+// 	// void build_and_attach_right_side(Triangulation<dim>& tria) const;
+// 	// void build_and_attach_upper_triangle(Triangulation<dim>& tria) const;
+// 	// void build_and_attach_lower_triangle(Triangulation<dim>& tria) const;
+
+// 	void build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const;
+
+// 	void attach_symmetric_right_side(Triangulation<dim>& tria) const;
+// 	void attach_right_side_triangles(Triangulation<dim>& tria) const;
+// };
+
+// // IMPL
+// // -------------------------------------------------------------------------------
+
+// /** \brief BowTie constructor */
+// /** @todo currently requires funnel subsection parameters, how to get around this? */
+// template<int dim>
+// BowTie<dim>::BowTie(const ParameterHandler& prm)
+// 	:
+// 	Funnel<dim>(prm),
+// 	left_length(Funnel<dim>::left_length),
+// 	center_length(Funnel<dim>::center_length),
+// 	right_length(Funnel<dim>::right_length),
+// 	left_height(Funnel<dim>::left_height),
+// 	right_height(Funnel<dim>::right_height),
+// 	half_difference(Funnel<dim>::half_difference)
+// {}
+
+// // // class parameters:
+// // template<int dim>
+// // void 
+// // Funnel<dim>::declare_parameters(ParameterHandler& prm)
+// // {
+// // 	prm.enter_subsection("Geometry");
+// // 		prm.enter_subsection("Funnel");
+// // 			prm.declare_entry("Left length","1",Patterns::Double());
+// // 			prm.declare_entry("Center length","1",Patterns::Double());
+// // 			prm.declare_entry("Right length","1",Patterns::Double());
+// // 			prm.declare_entry("Left height","1",Patterns::Double());
+// // 			prm.declare_entry("Right height","1",Patterns::Double());
+// // 		prm.leave_subsection();
+// // 	prm.leave_subsection();
+// // }
+
+// /** \brief Build BowTie geometry */
+// template<int dim>
+// void 
+// BowTie<dim>::build_geometry(Geometry<dim>& geo) const
+// {
+// 	const double width = 2.*left_length + 2.*center_length + right_length;
+// 	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+// 	Point<dim> bottom_left, top_right;
+
+// 	// bottom corner at origin:
+// 	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+// 		bottom_left[dim_itr] = 0;
+
+// 	top_right[0] = width;
+// 	top_right[1] = left_height;
+// 	//(left_height > right_height)? left_height : right_height; // pick max
+
+// 	// set bounding domain:
+// 	geo.setBottomLeftPoint(bottom_left);
+// 	geo.setTopRightPoint(top_right);
+
+// 	// add lines:
+// 	this->set_funnel_geo_lines(geo);
+
+// 	set_extra_bowtie_lines(geo);
+
+// 	// SET PROPER BOUNDARY CONDITIONS FOR FUNNEL:
+// 	geo.setBoundaryCondition(0, BoundaryCondition::OPEN); // OPEN IN x DIRECTION
+// 	for(unsigned int i = 1; i < dim; ++i)
+// 		geo.setBoundaryCondition(i, BoundaryCondition::REFLECT); // REFLECT REST
+// }
+
+// template<int dim>
+// void 
+// BowTie<dim>::set_extra_bowtie_lines(Geometry<dim>& geo) const
+// {
+// 	Point<2> left_start, right_end;
+// 	left_start[0] = left_length + center_length + right_length;
+// 	right_end[0] = left_start[0] + center_length;
+
+// 	//bottom line:
+// 	left_start[1] = half_difference;
+// 	right_end[1] = 0.;
+// 	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
+	
+// 	// top line:	
+// 	left_start[1] = half_difference + right_height;
+// 	right_end[1] = left_height;
+// 	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
+// }
+
+// /** \brief Build base grid for BowTie geometry */
+// template<int dim>
+// void 
+// BowTie<dim>::build_grid_base(const Geometry<dim>& /*geo*/, Triangulation<dim>& tria) const
+// {
+// 	this->build_left_side(tria);
+// 	build_and_attach_right_side_bowtie(tria);
+// 	this->build_and_attach_lower_triangle(tria);
+// 	this->build_and_attach_upper_triangle(tria);
+// 	attach_symmetric_right_side(tria);
+// 	attach_right_side_triangles(tria);
+// }
+
+// /** \brief Build center portion of bowtie grid */
+// /** As with funnel but extended outward to incorporate right side of bowtie */
+// template<int dim>
+// void 
+// BowTie<dim>::build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const
+// {
+// 	Triangulation<2> aux;
+
+// 	const double width = left_length + center_length + right_length;
+// 	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
+// 	const double quarter_difference = 0.5*half_difference;
+
+// 	std::vector<double> x_divisions, y_divisions;
+
+// 	// split center length in half to fit simplex:
+// 	const double hcl = 0.5*center_length;
+
+// 	x_divisions.emplace_back(hcl); // includes middle portion
+// 	x_divisions.emplace_back(hcl); 
+
+// 	// x_divisions.emplace_back(right_length); // further divide this if right length is larger than half center
+// 	if(right_length > hcl)
+// 	{
+// 		const double n_x_divs = std::round(right_length/hcl);
+// 		const double dx = right_length/n_x_divs;
+
+// 		for(unsigned int i = 0; i < n_x_divs; ++i)
+// 			x_divisions.emplace_back(dx);
+// 	}
+// 	else
+// 	{
+// 		x_divisions.emplace_back(right_length); 
+// 	} /** @todo may want to futher divide if right is much less than half center */
+
+// 	// ADD EXTRA DIVISIONS TO RIGHT FOR BOWTIE:
+// 	// copy left hcl divisions
+// 	x_divisions.emplace_back(hcl); // includes middle portion
+// 	x_divisions.emplace_back(hcl); 
+
+// 	// y_divisions.emplace_back(right_height);
+// 	if(right_height > quarter_difference)
+// 	{
+// 		const double n_divs = std::round(right_height/quarter_difference);
+// 		const double delta = right_height/n_divs;
+
+// 		for(unsigned int i = 0; i < n_divs; ++i)
+// 			y_divisions.emplace_back(delta);
+// 	}
+// 	else
+// 	{
+// 		y_divisions.emplace_back(right_height);
+// 	} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+// 	const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+// 	dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+//                                             step_sizes,
+//                                             Point<2>(left_length,
+//                                             		half_difference), // bottom corner
+//                                             Point<2>(width + center_length, //including extra bowtie portion
+//                                             	half_difference + right_height));
+
+// 	// shift:
+// 	// already in correct spot
+
+// 	// merge:
+// 	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+// }
+
+// template<int dim>
+// void 
+// BowTie<dim>::attach_symmetric_right_side(Triangulation<dim>& tria) const
+// {
+// 	// build left side again and shift:
+// 	Triangulation<2> aux;
+// 	this->build_left_side(aux);
+
+// 	// shift:
+// 	Tensor<1, 2> shift_vector;
+// 	shift_vector[0] = left_length + 2.0*center_length + right_length;
+// 	shift_vector[1] = 0;
+// 	dealii::GridTools::shift(shift_vector, aux);
+
+// 	dealii::GridGenerator::merge_triangulations(aux, tria, tria); 
+// }
+
+// template<int dim>
+// void 
+// BowTie<dim>::attach_right_side_triangles(Triangulation<dim>& tria) const
+// {
+// 	const double base_dist = left_length + 2.*center_length + right_length;
+// 	// top right triangle:
+// 	{
+// 		Triangulation<2> aux;
+
+// 		// go counter clockwise starting at rectangle corner
+// 		const Point<2> p1(base_dist, half_difference + right_height);
+// 		const Point<2> p2(base_dist, left_height);
+// 		const Point<2> p3(base_dist - center_length, half_difference + right_height);
+		
+// 		const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+// 		dealii::GridGenerator::simplex(aux, vertices);
+
+// 		// merge:
+// 		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+// 	}
+
+// 	// bottom right triangle:
+// 	{
+// 		Triangulation<2> aux;
+
+// 		// go counter clockwise starting at rectangle corner
+// 		const Point<2> p1(base_dist, half_difference);
+// 		const Point<2> p2(base_dist - center_length, half_difference);
+// 		const Point<2> p3(base_dist, 0);
+
+// 		const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+// 		dealii::GridGenerator::simplex(aux, vertices);
+
+// 		// merge:
+// 		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+// 	}
+// }
+
+// /** \brief Print BowTie geometry info */
+// template<int dim>
+// void 
+// BowTie<dim>::printInfo(std::ostream& out) const
+// {
+// 	out << Utility::short_line << std::endl
+// 		<< "\t BowTie:" << std::endl
+// 		<< Utility::short_line << std::endl
+// 		<< "Left length: " << left_length << std::endl
+// 		<< "Center length: " << center_length << std::endl
+// 		<< "Right length: " << right_length << std::endl
+// 		<< "Left height: " << left_height << std::endl
+// 		<< "Right height: " << right_height << std::endl
+// 		<< Utility::short_line << std::endl << std::endl;
+// }
+
+
 // -------------------------------------------------------------------------------
-// 		BOWTIE:
+// 		BOWTIE: (replace current bowtie)
 // -------------------------------------------------------------------------------
 /** \brief Class to construct BowTie type geometry */
 /** Inherits from Funnel, making use of most of the same methods, and just adding 
 * geometry on right side.
 */
 template<int dim>
-class BowTie : public Funnel<dim>{
+class BowTie : public BuilderBase<dim>{
 public:
-	// constructor
 	BowTie(const ParameterHandler& prm);
 
 	// class parameters:
-	// static void declare_parameters(ParameterHandler& prm); 
+	static void declare_parameters(ParameterHandler& prm); 
 
 	// override virtual methods:
 	void build_geometry(Geometry<dim>& geo) const override; 
@@ -2020,74 +2309,84 @@ public:
 	void printInfo(std::ostream& out) const override;
 private:
 
-	// inherited:
-	// double left_length;
-	// double center_length;
-	// double right_length;
-	// double left_height;
-	// double right_height;
+	double left_length;
+	double transition_length; // symmetric on both ends
+	double pinch_length;
+	double right_length;
+	double edge_height;
+	double pinch_height;
 
-	const double& left_length;
-	const double& center_length;
-	const double& right_length;
-	const double& left_height;
-	const double& right_height;
-	const double& half_difference;
+	double half_difference;
 
-	// void set_funnel_geo_lines(Geometry<dim>& geo) const;
+	// copied mostly from filter:
+
+	// geometry:
+	void set_funnel_geo_lines(Geometry<dim>& geo) const;
 	void set_extra_bowtie_lines(Geometry<dim>& geo) const;
 
-	// inherited support methods:
-	// void build_left_side(Triangulation<dim>& tria) const;
+	// support mesh building methods:
+	void build_left_side(Triangulation<dim>& tria) const;
 	// void build_and_attach_right_side(Triangulation<dim>& tria) const;
-	// void build_and_attach_upper_triangle(Triangulation<dim>& tria) const;
-	// void build_and_attach_lower_triangle(Triangulation<dim>& tria) const;
+	void build_and_attach_upper_triangle(Triangulation<dim>& tria) const;
+	void build_and_attach_lower_triangle(Triangulation<dim>& tria) const;
+
 
 	void build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const;
 
-	void attach_symmetric_right_side(Triangulation<dim>& tria) const;
+	void attach_right_side(Triangulation<dim>& tria) const;
 	void attach_right_side_triangles(Triangulation<dim>& tria) const;
 };
 
-// IMPL
-// -------------------------------------------------------------------------------
 
-/** \brief BowTie constructor */
-/** @todo currently requires funnel subsection parameters, how to get around this? */
+// IMPL
+// -------------------------------------------------------------------------
+
+// constructor
+/** \brief Constuctor for Funnel class */
 template<int dim>
 BowTie<dim>::BowTie(const ParameterHandler& prm)
 	:
-	Funnel<dim>(prm),
-	left_length(Funnel<dim>::left_length),
-	center_length(Funnel<dim>::center_length),
-	right_length(Funnel<dim>::right_length),
-	left_height(Funnel<dim>::left_height),
-	right_height(Funnel<dim>::right_height),
-	half_difference(Funnel<dim>::half_difference)
-{}
+	BuilderBase<dim>(prm) // gets mesh refinement parameters
+{
+	const std::string subsection = "Geometry.BowTie";
+	left_length = prm.get_double(subsection, "Left length");
+	transition_length = prm.get_double(subsection, "Transition length");
+	pinch_length = prm.get_double(subsection, "Pinch length");
+	right_length = prm.get_double(subsection, "Right length");
+	edge_height = prm.get_double(subsection, "Edge height");
+	pinch_height = prm.get_double(subsection, "Pinch height");
 
-// // class parameters:
-// template<int dim>
-// void 
-// Funnel<dim>::declare_parameters(ParameterHandler& prm)
-// {
-// 	prm.enter_subsection("Geometry");
-// 		prm.enter_subsection("Funnel");
-// 			prm.declare_entry("Left length","1",Patterns::Double());
-// 			prm.declare_entry("Center length","1",Patterns::Double());
-// 			prm.declare_entry("Right length","1",Patterns::Double());
-// 			prm.declare_entry("Left height","1",Patterns::Double());
-// 			prm.declare_entry("Right height","1",Patterns::Double());
-// 		prm.leave_subsection();
-// 	prm.leave_subsection();
-// }
+	if(pinch_height > edge_height)
+	{
+		throw std::runtime_error("not implemented with left height smaller than right");
+	}
 
-/** \brief Build BowTie geometry */
+	half_difference = 0.5*(std::fabs(edge_height - pinch_height));	
+}
+
+// class parameters:
 template<int dim>
 void 
+BowTie<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Geometry");
+		prm.enter_subsection("BowTie");
+			prm.declare_entry("Left length","1",Patterns::Double());
+			prm.declare_entry("Transition length","1",Patterns::Double());
+			prm.declare_entry("Pinch length","1",Patterns::Double());
+			prm.declare_entry("Right length","1",Patterns::Double());
+			prm.declare_entry("Edge height","1",Patterns::Double());
+			prm.declare_entry("Pinch height","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+template<int dim>
+void
 BowTie<dim>::build_geometry(Geometry<dim>& geo) const
 {
-	const double width = 2.*left_length + 2.*center_length + right_length;
+	const double width = left_length + right_length + 2.*transition_length 
+		+ pinch_length;
 	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
 
 	Point<dim> bottom_left, top_right;
@@ -2097,16 +2396,14 @@ BowTie<dim>::build_geometry(Geometry<dim>& geo) const
 		bottom_left[dim_itr] = 0;
 
 	top_right[0] = width;
-	top_right[1] = left_height;
-	//(left_height > right_height)? left_height : right_height; // pick max
+	top_right[1] = edge_height;
 
 	// set bounding domain:
 	geo.setBottomLeftPoint(bottom_left);
 	geo.setTopRightPoint(top_right);
 
 	// add lines:
-	this->set_funnel_geo_lines(geo);
-
+	set_funnel_geo_lines(geo);
 	set_extra_bowtie_lines(geo);
 
 	// SET PROPER BOUNDARY CONDITIONS FOR FUNNEL:
@@ -2117,11 +2414,50 @@ BowTie<dim>::build_geometry(Geometry<dim>& geo) const
 
 template<int dim>
 void 
+BowTie<dim>::set_funnel_geo_lines(Geometry<dim>& geo) const
+{
+	const double width = left_length + transition_length + pinch_length;
+
+	Point<2> left_start, right_end;
+
+	// center lines:
+	// ---------------------------
+	left_start[0] = left_length;
+	right_end[0] = left_length + transition_length;
+
+	// bottom line:
+	left_start[1] = 0; // y coordinate
+	right_end[1] = half_difference;
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
+
+	// top line:
+	left_start[1] = edge_height;
+	right_end[1] = half_difference + pinch_height;
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
+
+	// end lines:
+	// ---------------------------
+	left_start[0] = left_length + transition_length;
+	right_end[0] = width;
+
+	// bottom line:
+	left_start[1] = half_difference;
+	right_end[1] = half_difference;
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
+
+	// top line:
+	left_start[1] = half_difference + pinch_height; 
+	right_end[1] = half_difference + pinch_height;
+	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
+}
+
+template<int dim>
+void 
 BowTie<dim>::set_extra_bowtie_lines(Geometry<dim>& geo) const
 {
 	Point<2> left_start, right_end;
-	left_start[0] = left_length + center_length + right_length;
-	right_end[0] = left_start[0] + center_length;
+	left_start[0] = left_length + transition_length + pinch_length;
+	right_end[0] = left_start[0] + transition_length;
 
 	//bottom line:
 	left_start[1] = half_difference;
@@ -2129,8 +2465,8 @@ BowTie<dim>::set_extra_bowtie_lines(Geometry<dim>& geo) const
 	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::ABOVE));
 	
 	// top line:	
-	left_start[1] = half_difference + right_height;
-	right_end[1] = left_height;
+	left_start[1] = half_difference + pinch_height;
+	right_end[1] = edge_height;
 	geo.addLine(Line<dim>(left_start, right_end, Line<dim>::BELOW));
 }
 
@@ -2139,12 +2475,70 @@ template<int dim>
 void 
 BowTie<dim>::build_grid_base(const Geometry<dim>& /*geo*/, Triangulation<dim>& tria) const
 {
-	this->build_left_side(tria);
+	build_left_side(tria); // from funnel
 	build_and_attach_right_side_bowtie(tria);
-	this->build_and_attach_lower_triangle(tria);
-	this->build_and_attach_upper_triangle(tria);
-	attach_symmetric_right_side(tria);
+	build_and_attach_lower_triangle(tria); // from funnel
+	build_and_attach_upper_triangle(tria); // from funnel
+	attach_right_side(tria);
 	attach_right_side_triangles(tria);
+}
+
+template<int dim>
+void
+BowTie<dim>::build_left_side(Triangulation<dim>& tria) const
+{
+	std::vector<double> x_divisions, y_divisions;
+
+	// coarsest needed is to accomodate right side, and triangles
+
+	// x divisions (make same as y later)
+	// x_divisions.emplace_back(left_length); // update to match right side...
+	// split center length in half to fit simplex:
+	const double hcl = 0.5*transition_length;
+	if(left_length > hcl)
+	{
+		const double n_x_divs = std::round(left_length/hcl);
+		const double dx = left_length/n_x_divs;
+
+		for(unsigned int i = 0; i < n_x_divs; ++i)
+			x_divisions.emplace_back(dx);
+	}
+	else
+	{
+		x_divisions.emplace_back(left_length); 
+	} /** @todo may want to futher divide if left is much less than half center */
+
+
+	// const double half_difference = 0.5*(std::fabs(left_height - right_height)); // ** store in class
+	
+	// split in half for simplex attachment
+	const double quarter_difference = 0.5*half_difference;
+	y_divisions.emplace_back(quarter_difference);
+	y_divisions.emplace_back(quarter_difference);
+	
+	// y_divisions.emplace_back(right_height);	// replace with possible subdivision
+	if(pinch_height > quarter_difference)
+	{
+		const double n_divs = std::round(pinch_height/quarter_difference);
+		const double delta = pinch_height/n_divs;
+
+		for(unsigned int i = 0; i < n_divs; ++i)
+			y_divisions.emplace_back(delta);
+	}
+	else
+	{
+		y_divisions.emplace_back(pinch_height);
+	} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+	y_divisions.emplace_back(quarter_difference);
+	y_divisions.emplace_back(quarter_difference);
+
+	const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+	dealii::GridGenerator::subdivided_hyper_rectangle(tria,
+                                            step_sizes,
+                                            Point<2>(0,0), // bottom corner
+                                            Point<2>(left_length, edge_height));
 }
 
 /** \brief Build center portion of bowtie grid */
@@ -2155,30 +2549,30 @@ BowTie<dim>::build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const
 {
 	Triangulation<2> aux;
 
-	const double width = left_length + center_length + right_length;
+	const double width = left_length + transition_length + pinch_length;
 	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
 	const double quarter_difference = 0.5*half_difference;
 
 	std::vector<double> x_divisions, y_divisions;
 
 	// split center length in half to fit simplex:
-	const double hcl = 0.5*center_length;
+	const double hcl = 0.5*transition_length;
 
 	x_divisions.emplace_back(hcl); // includes middle portion
 	x_divisions.emplace_back(hcl); 
 
 	// x_divisions.emplace_back(right_length); // further divide this if right length is larger than half center
-	if(right_length > hcl)
+	if(pinch_length > hcl)
 	{
-		const double n_x_divs = std::round(right_length/hcl);
-		const double dx = right_length/n_x_divs;
+		const double n_x_divs = std::round(pinch_length/hcl);
+		const double dx = pinch_length/n_x_divs;
 
 		for(unsigned int i = 0; i < n_x_divs; ++i)
 			x_divisions.emplace_back(dx);
 	}
 	else
 	{
-		x_divisions.emplace_back(right_length); 
+		x_divisions.emplace_back(pinch_length); 
 	} /** @todo may want to futher divide if right is much less than half center */
 
 	// ADD EXTRA DIVISIONS TO RIGHT FOR BOWTIE:
@@ -2187,17 +2581,17 @@ BowTie<dim>::build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const
 	x_divisions.emplace_back(hcl); 
 
 	// y_divisions.emplace_back(right_height);
-	if(right_height > quarter_difference)
+	if(pinch_height > quarter_difference)
 	{
-		const double n_divs = std::round(right_height/quarter_difference);
-		const double delta = right_height/n_divs;
+		const double n_divs = std::round(pinch_height/quarter_difference);
+		const double delta = pinch_height/n_divs;
 
 		for(unsigned int i = 0; i < n_divs; ++i)
 			y_divisions.emplace_back(delta);
 	}
 	else
 	{
-		y_divisions.emplace_back(right_height);
+		y_divisions.emplace_back(pinch_height);
 	} /** @todo may want to account for very thin second channel and refine outer bulk */
 
 	const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
@@ -2206,11 +2600,8 @@ BowTie<dim>::build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const
                                             step_sizes,
                                             Point<2>(left_length,
                                             		half_difference), // bottom corner
-                                            Point<2>(width + center_length, //including extra bowtie portion
-                                            	half_difference + right_height));
-
-	// shift:
-	// already in correct spot
+                                            Point<2>(width + transition_length, //including extra bowtie portion
+                                            	half_difference + pinch_height));
 
 	// merge:
 	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
@@ -2218,15 +2609,108 @@ BowTie<dim>::build_and_attach_right_side_bowtie(Triangulation<dim>& tria) const
 
 template<int dim>
 void 
-BowTie<dim>::attach_symmetric_right_side(Triangulation<dim>& tria) const
+BowTie<dim>::build_and_attach_upper_triangle(Triangulation<dim>& tria) const
+{
+	Triangulation<2> aux;
+
+	//The vertices argument contains a vector with all d+1 vertices of the simplex. 
+	// They must be given in an order such that the vectors from the first vertex to
+	// each of the others form a right-handed system. 
+
+	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+	// go counter clockwise starting at rectangle corner
+	const Point<2> p1(left_length, half_difference + pinch_height);
+	const Point<2> p2(left_length + transition_length, half_difference + pinch_height);
+	const Point<2> p3(left_length, edge_height);
+
+	const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+	dealii::GridGenerator::simplex(aux, vertices);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+}
+
+template<int dim>
+void 
+BowTie<dim>::build_and_attach_lower_triangle(Triangulation<dim>& tria) const
+{
+	Triangulation<2> aux;
+
+	//The vertices argument contains a vector with all d+1 vertices of the simplex. 
+	// They must be given in an order such that the vectors from the first vertex to
+	// each of the others form a right-handed system. 
+	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
+
+	// go counter clockwise starting at rectangle corner
+	const Point<2> p1(left_length, half_difference);
+	const Point<2> p2(left_length, 0);
+	const Point<2> p3(left_length + transition_length, half_difference);
+
+	const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
+	dealii::GridGenerator::simplex(aux, vertices);
+
+	// merge:
+	dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+}
+
+template<int dim>
+void 
+BowTie<dim>::attach_right_side(Triangulation<dim>& tria) const
 {
 	// build left side again and shift:
 	Triangulation<2> aux;
-	this->build_left_side(aux);
+	// this->build_left_side(aux);
+
+	// build right side
+		std::vector<double> x_divisions, y_divisions;
+
+		const double hcl = 0.5*transition_length;
+		if(right_length > hcl)
+		{
+			const double n_x_divs = std::round(right_length/hcl);
+			const double dx = right_length/n_x_divs;
+
+			for(unsigned int i = 0; i < n_x_divs; ++i)
+				x_divisions.emplace_back(dx);
+		}
+		else
+		{
+			x_divisions.emplace_back(right_length); 
+		} /** @todo may want to futher divide if left is much less than half center */
+
+		// split in half for simplex attachment
+		const double quarter_difference = 0.5*half_difference;
+		y_divisions.emplace_back(quarter_difference);
+		y_divisions.emplace_back(quarter_difference);
+		
+		// y_divisions.emplace_back(right_height);	// replace with possible subdivision
+		if(pinch_height > quarter_difference)
+		{
+			const double n_divs = std::round(pinch_height/quarter_difference);
+			const double delta = pinch_height/n_divs;
+
+			for(unsigned int i = 0; i < n_divs; ++i)
+				y_divisions.emplace_back(delta);
+		}
+		else
+		{
+			y_divisions.emplace_back(pinch_height);
+		} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+		y_divisions.emplace_back(quarter_difference);
+		y_divisions.emplace_back(quarter_difference);
+
+		const std::vector< std::vector< double > >  step_sizes = {x_divisions, y_divisions};
+
+		dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+	                                            step_sizes,
+	                                            Point<2>(0,0), // bottom corner
+	                                            Point<2>(right_length, edge_height));
 
 	// shift:
 	Tensor<1, 2> shift_vector;
-	shift_vector[0] = left_length + 2.0*center_length + right_length;
+	shift_vector[0] = left_length + 2.0*transition_length + pinch_length;
 	shift_vector[1] = 0;
 	dealii::GridTools::shift(shift_vector, aux);
 
@@ -2237,15 +2721,15 @@ template<int dim>
 void 
 BowTie<dim>::attach_right_side_triangles(Triangulation<dim>& tria) const
 {
-	const double base_dist = left_length + 2.*center_length + right_length;
+	const double base_dist = left_length + 2.*transition_length + pinch_length;
 	// top right triangle:
 	{
 		Triangulation<2> aux;
 
 		// go counter clockwise starting at rectangle corner
-		const Point<2> p1(base_dist, half_difference + right_height);
-		const Point<2> p2(base_dist, left_height);
-		const Point<2> p3(base_dist - center_length, half_difference + right_height);
+		const Point<2> p1(base_dist, half_difference + pinch_height);
+		const Point<2> p2(base_dist, edge_height);
+		const Point<2> p3(base_dist - transition_length, half_difference + pinch_height);
 		
 		const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
 		dealii::GridGenerator::simplex(aux, vertices);
@@ -2260,7 +2744,7 @@ BowTie<dim>::attach_right_side_triangles(Triangulation<dim>& tria) const
 
 		// go counter clockwise starting at rectangle corner
 		const Point<2> p1(base_dist, half_difference);
-		const Point<2> p2(base_dist - center_length, half_difference);
+		const Point<2> p2(base_dist - transition_length, half_difference);
 		const Point<2> p3(base_dist, 0);
 
 		const std::vector< Point< 2 >>  vertices = {p1, p2, p3};
@@ -2280,13 +2764,13 @@ BowTie<dim>::printInfo(std::ostream& out) const
 		<< "\t BowTie:" << std::endl
 		<< Utility::short_line << std::endl
 		<< "Left length: " << left_length << std::endl
-		<< "Center length: " << center_length << std::endl
+		<< "Transition length: " << transition_length << std::endl
+		<< "Pinch length: " << pinch_length << std::endl
 		<< "Right length: " << right_length << std::endl
-		<< "Left height: " << left_height << std::endl
-		<< "Right height: " << right_height << std::endl
+		<< "Edge height: " << edge_height << std::endl
+		<< "Pinch height: " << pinch_height << std::endl
 		<< Utility::short_line << std::endl << std::endl;
 }
-
 
 // -------------------------------------------------------------------------------
 // 		FANOUT:
@@ -3712,7 +4196,8 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 	Mixer<dim>::declare_parameters(prm);
 	Splitter<dim>::declare_parameters(prm);
 	Cylinder<dim>::declare_parameters(prm);
-	Funnel<dim>::declare_parameters(prm); // also for bowtie
+	Funnel<dim>::declare_parameters(prm); 
+	BowTie<dim>::declare_parameters(prm); 
 	ChannelMixer<dim>::declare_parameters(prm);
 	FanOut<dim>::declare_parameters(prm);
 	FanIn<dim>::declare_parameters(prm);
