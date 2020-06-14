@@ -348,6 +348,7 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 			// else --- is open
 		}
 	} // for dim
+
 } // check_boundaries()
 
 

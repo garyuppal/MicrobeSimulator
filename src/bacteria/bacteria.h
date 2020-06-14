@@ -21,7 +21,7 @@ namespace MicrobeSimulator{
 template<int dim>
 std::vector<Point<dim> >
 get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups,
-	double buffer, double left_start_width, double left_start_buffer)
+	double buffer, double left_start_width, double left_start_buffer, double y_start_buffer)
 {
 	std::cout << "...Finding " << number_groups
 		<< " group positions" << std::endl;
@@ -46,6 +46,9 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		  	if( (dim_itr == 0) && (left_start_width > 0) )
 		  		width = left_start_width; 
 
+		  	if( (dim_itr == 1) && (y_start_buffer > 0) )
+		  		width -= 2*y_start_buffer;
+
 		  	if(left_start_buffer < 0)
 		  		left_start_buffer = 0;
 
@@ -53,6 +56,7 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 		      + geometry.getBottomLeftPoint()[dim_itr] + buffer;
 		  } // set temp point
 	  	temp_point[0] = temp_point[0] + left_start_buffer; // buffer for left side (x axis)
+	  	temp_point[1] = temp_point[1] + y_start_buffer;
 
 		  if( geometry.isInDomain(temp_point, buffer) )
 		  {
@@ -534,6 +538,7 @@ Bacteria<dim>::declare_parameters(ParameterHandler& prm)
 		// left length, for reintoduction
 		prm.declare_entry("Left start width","-1",Patterns::Double());
 		prm.declare_entry("Left start buffer","0",Patterns::Double());
+		prm.declare_entry("Y start buffer","0",Patterns::Double());
 	prm.leave_subsection();
 
 	// declare parameters for each type:
@@ -598,9 +603,10 @@ Bacteria<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& ge
 		
 		const double left_start_width = prm.get_double(section, "Left start width");
 		const double left_start_buffer = prm.get_double(section, "Left start buffer");
+		const double y_start_buffer = prm.get_double(section, "Y start buffer");
 
 		initial_locations = get_bacteria_locations(geo, number_groups, 
-			edge_buffer, left_start_width, left_start_buffer);
+			edge_buffer, left_start_width, left_start_buffer, y_start_buffer);
 	}
 
 	const unsigned int n_bact_base = 

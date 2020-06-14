@@ -342,15 +342,21 @@ RankineVortex<dim>::RankineVortex(double gamma, double r)
 template<int dim>
 Tensor<1, dim> 
 RankineVortex<dim>::value(const Point<dim>& location) const
-{
+{	
 	const double dist = sqrt( location*location );
     const double theta = atan2(location[1], location[0]); 
     const double v = ( (dist <= radius) ? circulation*dist/( 2.*numbers::PI
     															*radius*radius )
     							: circulation/( 2.*numbers::PI*dist ) );
     Tensor<1, dim> return_value;
-    return_value[0] = v*cos(theta);
-    return_value[1] = -v*sin(theta);
+    return_value[0] = -v*sin(theta);
+    return_value[1] = v*cos(theta);
+
+    // std::cout << "location: " << location 
+    // 	<< "dist: " << dist 
+    // 	<< "theta: " << theta
+    // 	<< "v: " << v 
+    // 	<< "return_value: " << return_value << std::endl;
 
 	return return_value;
 }
@@ -398,7 +404,7 @@ RankineVortex<dim>::printInfo(std::ostream& out) const
 		<< "\t Rankine vortex flow:" << std::endl
 		<< Utility::short_line << std::endl
 		<< "Circulation: " << circulation << std::endl
-		<< "Radiue: " << radius << std::endl
+		<< "Radius: " << radius << std::endl
 		<< Utility::short_line << std::endl << std::endl;
 }
 

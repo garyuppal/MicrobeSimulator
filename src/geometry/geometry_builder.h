@@ -4056,7 +4056,9 @@ void
 Cylinder<dim>::build_grid_base(const Geometry<dim>& /* geo */, 
 									Triangulation<dim>& tria) const
 {
-	dealii::GridGenerator::cylinder(tria, radius, 0.5*length/* half_length */);
+	// dealii::GridGenerator::cylinder(tria, radius, 0.5*length/* half_length */);
+	dealii::GridGenerator::hyper_ball(tria, Point< dim >(), radius);
+	// extrude for 3d...
 }
 
 /** \brief Manifold assignment for cylinder */

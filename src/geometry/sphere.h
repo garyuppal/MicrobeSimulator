@@ -7,6 +7,8 @@ using dealii::Point;
 #include <deal.II/base/tensor.h>
 using dealii::Tensor;
 
+#include <sstream>
+
 /* Check to see if all modifications can be made solely in this class
 * for exterior type boundaries
 *
@@ -241,7 +243,10 @@ Sphere<dim>::getLineSphereIntersection(const Point<dim>& oldPoint,
                                 const Point<dim>& newPoint, 
                                 const double buffer) const
 {
-	const double effective_radius = radius + buffer;
+	const double effective_radius = (obstacle_type == ObstacleType::EXTERIOR)?
+									radius - buffer :
+									radius + buffer;
+
 	// direction of line:  ( line = oldPoint + d*direction)
 	Tensor<1,dim> direction = newPoint - oldPoint;
 	direction /= direction.norm(); // unit vector
@@ -254,7 +259,17 @@ Sphere<dim>::getLineSphereIntersection(const Point<dim>& oldPoint,
 	const double discriminant = b*b - c;
 
 	if(discriminant < 0)
-		throw std::runtime_error("Error: Line does not intersect sphere");
+	{
+		std::ostringstream msg;
+
+		msg << "Error: Line does not intersect sphere: \n"
+			<< "old point: " << oldPoint
+			<< " new point: " << newPoint
+			<< " buffer: " << buffer 
+			<< "\n sphere: center = " << center
+			<< " radius = " << radius << "\n";
+		throw std::runtime_error(msg.str());
+	}
 
 	if(discriminant == 0)
 		return oldPoint + (-b)*direction;

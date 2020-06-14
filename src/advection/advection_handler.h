@@ -136,6 +136,13 @@ AdvectionHandler<dim>::init(const ParameterHandler& prm,
 		setup_square_pipe( geometry.getTopRightPoint()[1], // y height from geometry
 							prm.get_double(section, "Maximum velocity") ); 	
 	}
+	else if( boost::iequals(velocity_type, "VORTEX") )
+	{
+		std::cout << "...setting up vortex flow " << std::endl << std::endl;
+		velocity_function = std::make_shared<RankineVortex<dim> >(
+								prm.get_double(section, "Vortex circulation"),
+								prm.get_double(section, "Vortex radius") );
+	}
 	else
 	{
 		throw std::runtime_error("Need to implement other flow types...");
