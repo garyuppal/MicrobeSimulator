@@ -1,5 +1,4 @@
-#ifndef MICROBESIMULATOR_SIMULATOR_H
-#define MICROBESIMULATOR_SIMULATOR_H
+#pragma once
 
 #include <deal.II/grid/tria.h>
 using dealii::Triangulation;
@@ -7,7 +6,6 @@ using dealii::Triangulation;
 // #include "../bacteria/bacteria_handler.h"
 
 #include "../bacteria/bacteria.h"
-
 #include "../bacteria/bacteria_fitness.h"
 #include "../advection/advection_handler.h"
 #include "../geometry/geometry.h"
@@ -86,6 +84,12 @@ private:
 	unsigned int 							bacteria_time_step_multiplier;
 	unsigned int 							number_reintroduced; // for adding in new groups
 
+	double 									reset_period;
+
+	// mixer debug:
+	double edge_buffer;
+	dealii::Point<dim> initial_point, trial_point, final_point;
+
 
 	// output:
 	void output_bacteria() const;
@@ -97,6 +101,8 @@ private:
 	// update:
 	void update_bacteria();
 	void reintro_bacteria(); 
+
+	void reset_chemicals();
 
 	// setup:
 	void declare_parameters();
@@ -115,6 +121,10 @@ private:
 	// Simulators:
 	void run_microbes();
 	void init_microbe_growth();
+
+	void run_aging();
+
+	void run_mixer_debug();
 
 	// FOR CONVERGENCE TEST:
 	void reset_system(const unsigned int cycle, 
@@ -152,7 +162,17 @@ Simulator<dim>::run()
 {
 	setup_parameters();
 	setup_system();
-	run_microbes();
+
+	const std::string sim_type = prm.get("Simulator type");
+
+	if( boost::iequals(sim_type, "Bacteria") )
+		run_microbes();
+	else if( boost::iequals(sim_type, "Aging") )
+		run_aging();
+	else if( boost::iequals(sim_type, "Mixer debug") )
+		run_mixer_debug();
+	else
+		throw std::runtime_error("Simulation type <" + sim_type + "> is invalid");
 }
 
 template<int dim>
@@ -324,6 +344,114 @@ Simulator<dim>::reintro_bacteria()
 	}	
 }
 
+template<int dim>
+void
+Simulator<dim>::run_mixer_debug()
+{
+	std::cout << std::endl << std::endl
+			<< "Running mixer debug" << std::endl
+			<< Utility::long_line << std::endl
+			<< Utility::long_line << std::endl << std::endl;	// buffer from edge buffer in bacteria class
+
+	std::cout << "initial point: " << initial_point << std::endl;
+	std::cout << "trial target point: " << trial_point << std::endl;
+	
+	// points given as input as well -- make new parameter section...
+		geometry.checkBoundaries(initial_point, trial_point, edge_buffer); 
+
+	std::cout << "\n\noriginal wrong final point: " << final_point << std::endl;
+	std::cout << "new target point: " << trial_point << std::endl;
+
+		std::cout << std::endl << std::endl << std::endl
+			<< Utility::long_line << std::endl
+			<< "...Done" << std::endl
+			<< Utility::long_line << std::endl << std::endl;	// buffer from edge buffer in bacteria class
+}
+
+template<int dim>
+void 
+Simulator<dim>::run_aging()
+{
+	std::cout << std::endl << std::endl
+			<< "Starting aging simulation" << std::endl
+			<< Utility::long_line << std::endl
+			<< Utility::long_line << std::endl << std::endl;
+
+	// save period:
+	const unsigned int modsave
+		= static_cast<unsigned int>( std::ceil(save_period / chemical_time_step) );
+	const bool isSavingChemicals = prm.get_bool("Chemicals","Save chemicals");
+	const bool recordMass = prm.get_bool("Debug","Record chemical mass");
+	const bool trackMicrobeChem = prm.get_bool("Debug","Track microbe chemicals");
+	const unsigned int mod_reset
+		= static_cast<unsigned int>( std::ceil(reset_period / chemical_time_step) );
+	
+	// init_microbe_growth(); // initializataion without flow or mutation
+
+	// check after intial spread:
+	output_bacteria(); // initial output
+	++save_step_number;
+
+	// for now, to use update with no sources:
+	std::vector<Point<dim> > no_source_loc; // = {Point<dim>()};
+	no_source_loc.clear();
+	std::vector<std::vector<double> > no_sources = {{0}};
+	no_sources.clear();
+
+	std::cout << "projecting constant solutions" << std::endl;
+	reset_chemicals();
+	// start with resources, or periodically add in
+	// chemicals.project_function(ExactFunctions::Constant<dim>(10.) ,0);
+	// chemicals.project_function(ExactFunctions::Constant<dim>(100.) ,1);
+
+	do{
+		// update time:
+		time += chemical_time_step;
+		++time_step_number;
+
+		// output:
+		if(time_step_number % modsave == 0)
+		{
+			std::cout << "saving at time: " << time << std::endl;
+			if(isSavingChemicals)
+				output_chemicals();
+			if(recordMass)
+				output_chemical_mass();
+			if(trackMicrobeChem)
+				output_local_chemicals();
+
+			output_bacteria();
+			++save_step_number;
+		}
+
+		chemicals.update(bacteria.getAllLocations(),  // only need this once!!
+						bacteria.getAllRates(), // could probably speed this up! 
+						bacteria.getAllLocations(), 
+						bacteria.getAllConsumptionRates()); 
+
+		// reset chemicals as needed:
+		if(time_step_number % mod_reset == 0)
+			reset_chemicals();
+
+		// with sinks!!!
+			// need to implement on FE_CHEM end
+		//... also check reproduce, add aging type fitness...
+
+		if(time_step_number % bacteria_time_step_multiplier == 0)
+		{
+			// update bacteria:
+			// bacteria.move(bacteria_time_step, geometry, velocity_function);
+			bacteria.reproduce(bacteria_time_step, fitness_function);
+			// bacteria.mutate(bacteria_time_step);
+			// bacteria.update_state(bacteria_time_step, chemicals);
+		}
+
+		if(!bacteria.isAlive())
+			std::cout << "Everyone died!" << std::endl;
+
+	}while( bacteria.isAlive() && (time < run_time) );
+}
+
 
 // UPDATE:
 // ---------------------------------------------------
@@ -334,10 +462,49 @@ template<int dim>
 void
 Simulator<dim>::update_bacteria()
 {
+	// static int ssn = 1;
+
+	// // output before and after move:
+	// {
+	// 	std::string outfile = output_directory
+	// 					+ "/before_move_bacteria_"
+	// 					+ dealii::Utilities::int_to_string(ssn,6)
+	// 					+ ".dat";
+	// 	std::ofstream out(outfile);
+	// 	bacteria.print(out);
+	// }
 	bacteria.move(bacteria_time_step, geometry, velocity_function);
+
+	// // output before and after move:
+	// {
+	// 	std::string outfile = output_directory
+	// 					+ "/after_move_bacteria_"
+	// 					+ dealii::Utilities::int_to_string(ssn,6)
+	// 					+ ".dat";
+	// 	std::ofstream out(outfile);
+	// 	bacteria.print(out);
+	// }
+	// ssn++;
+
 	bacteria.reproduce(bacteria_time_step, fitness_function);
 	bacteria.mutate(bacteria_time_step);
 	bacteria.update_state(bacteria_time_step, chemicals);
+}
+
+
+template<int dim>
+void
+Simulator<dim>::reset_chemicals()
+{
+	const unsigned int n_chem = chemicals.getNumberChemicals();
+	const std::vector<double> amps = prm.get_double_vector("Aging",
+														"Reset amplitudes");
+
+	for(unsigned int i = 0; i < n_chem; ++i)
+		chemicals.project_function(
+			ExactFunctions::Constant<dim>(amps[i]) ,i);
+
+	std::cout << "reset chems" << std::endl;
 }
 
 // OUTPUT:
@@ -530,6 +697,23 @@ Simulator<dim>::assign_local_parameters()
 {
 	run_time = prm.get_double("Run time");
 	save_period = prm.get_double("Save period");
+	reset_period = prm.get_double("Aging","Chemical reset period");
+
+	const std::string sim_type = prm.get("Simulator type");
+
+	if( boost::iequals(sim_type, "Mixer debug") )
+	{
+		edge_buffer = prm.get_double("Bacteria","Edge buffer");
+
+		std::vector<dealii::Point<2> > points = prm.get_point_list("Mixer debug", "Test points");
+
+		std::cout << "reading in " << points.size() << " points" << std::endl;
+		assert(points.size() == 3);
+
+		initial_point = points[0];
+		trial_point = points[1];
+		final_point = points[2];
+	}
 }
 
 /** \brief Setup suitable time steps for bacteria and chemicals */
@@ -580,12 +764,23 @@ Simulator<dim>::declare_parameters()
 {
 	prm.declare_entry("Simulator type",
 						"Bacteria",
-						Patterns::Selection("Bacteria|IC_AS|Aging|Chemotaxis"),
+						Patterns::Selection("Bacteria|IC_AS|Aging|Chemotaxis|Mixer debug"),
 						"Simulator type.");
 	prm.declare_entry("Time step", "1", Patterns::Double());
 	prm.declare_entry("Run time","0",Patterns::Double());
 	prm.declare_entry("Save period","1",Patterns::Double());
 	prm.declare_entry("Output directory","./",Patterns::Anything());
+
+	prm.enter_subsection("Aging");
+		prm.declare_entry("Chemical reset period","0",Patterns::Double());
+		prm.declare_entry("Reset amplitudes","{0}",Patterns::List(Patterns::Double()));
+	prm.leave_subsection();
+
+	prm.enter_subsection("Mixer debug");
+		// double edge_buffer; -- get from bacteria
+		// dealii::Point<dim> initial_point, trial_point, final_point;	 -- do as list
+		prm.declare_entry("Test points","{{}}",Patterns::List(Patterns::List(Patterns::Double())));
+	prm.leave_subsection();
 
 	// parameters for debugging: (only need to read in if in debug mode)
 	prm.enter_subsection("Debug");
@@ -594,7 +789,6 @@ Simulator<dim>::declare_parameters()
 		prm.declare_entry("Record chemical mass","False",Patterns::Bool());
 		prm.declare_entry("Track microbe chemicals","False",Patterns::Bool());
 		prm.declare_entry("Convergence check","False",Patterns::Bool());
-
 
 		// prm.enter_subsection("Gaussian");
 		// 	prm.declare_entry("Centers",
@@ -808,4 +1002,4 @@ Simulator<dim>::test_random_walk_boundaries()
 
 
 }} // CLOSE NAMESPACES
-#endif
+/* simulator.h */

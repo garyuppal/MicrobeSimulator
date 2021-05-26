@@ -12,6 +12,8 @@ using dealii::Function;
 #include "../utility/parameter_handler.h"
 #include "./control_functions.h"
 
+#include "./sources_sinks.h"
+
 #include <deal.II/base/convergence_table.h> // remove later
 
 
@@ -47,6 +49,14 @@ public:
 	virtual void update(const std::vector<Point<dim> >& locations, 
 						const std::vector<double>& amounts,
 						const Function<dim>& control_function) = 0;
+
+	virtual void update(const SourcesAndSinks<dim>& ss) = 0;
+
+	// for now, incorporate into one method maybe later
+	virtual void update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<double>& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<double>& sinks) = 0;
 
 	// accessors:
 	double getDiffusionConstant() const;

@@ -59,6 +59,11 @@ public:
 				const std::vector<std::vector<double> >& amounts,
 				const Controls<dim>& control_functions);
 
+	void update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<std::vector<double> >& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<std::vector<double> >& sinks);
+
 	// project function:
 	void project_function(const Function<dim>& initial_condition, unsigned int i);
 
@@ -223,6 +228,18 @@ ChemicalHandler<dim>::update(const std::vector<Point<dim> >& locations,
 {
 	for(unsigned int i = 0; i < chemicals.size(); ++i)
 		chemicals[i]->update(locations, amounts[i], control_functions[i]); 
+}
+
+template<int dim>
+void
+ChemicalHandler<dim>::update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<std::vector<double> >& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<std::vector<double> >& sinks)
+{
+	for(unsigned int i = 0; i < chemicals.size(); ++i)
+		chemicals[i]->update(source_locations, sources[i], 
+			sink_locations, sinks[i]); 	
 }
 
 /** \brief Project function to ith chemcical */

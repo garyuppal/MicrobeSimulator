@@ -63,15 +63,15 @@ public:
 	void addLine(const Line<dim>& line);
 
 	// HANDLING BOUNDARIES:
-	void checkBoundaries(const Point<dim>& oldPoint, 
+	void checkBoundaries(const Point<dim>& oldPoint, // check this
 	                   Point<dim>& newPoint,
 	                   const double buffer = 0.005) const; 
 
-	bool isInDomain(const Point<dim>& location, double buffer=0) const; 
+	bool isInDomain(const Point<dim>& location, double buffer=0) const; // check this
 
 	void addPointBuffer(const double buffer,
 	                   const Point<dim>& test_point,
-	                   Point<dim>& buffered_point) const; 
+	                   Point<dim>& buffered_point) const;  // maybe check this
 
 	void printInfo(std::ostream& out) const;
 	void outputGeometry(std::string output_directory = ".") const;
@@ -303,6 +303,8 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 	for(unsigned int sphere_id = 0; sphere_id < number_spheres; ++sphere_id)
 		if( (spheres[sphere_id].distance_from_border(newPoint) - buffer) < tolerance)
 		{
+			// std::cout << "checking sphere: " << sphere_id << std::endl;
+			
 			spheres[sphere_id].reflectPoint(oldPoint, newPoint, buffer); 
 			break;
 		}
@@ -312,22 +314,17 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 	for(unsigned int rect_id = 0; rect_id < number_rectangles; ++rect_id)
 		if( rectangles[rect_id].distance_from_border(newPoint, buffer) < tolerance ) 
 		{		
+			// std::cout << "checking rectangle: " << rect_id << std::endl;
+
 			rectangles[rect_id].reflectPoint(oldPoint, newPoint, buffer); 
 			break;        
-		}
-
-	// check interior lines:
-	unsigned int n_lines = lines.size();
-	for(unsigned int i = 0; i < n_lines; ++i)
-		if( !lines[i].is_in_bounds(newPoint, buffer) )
-		{
-			lines[i].reflectPoint(oldPoint, newPoint, buffer);
-			break;
 		}
 
 	// check bounding box:
 	for(unsigned int i = 0; i < dim; i++)
 	{
+		// std::cout << "checking box, dim: " << i << std::endl;
+
 		// bottom_left gives lower boundaries, top_right gives upper
 		if( newPoint[i] < (bottom_left[i]+buffer) )
 		{
@@ -348,6 +345,17 @@ Geometry<dim>::checkBoundaries(const Point<dim>& oldPoint, Point<dim>& newPoint,
 			// else --- is open
 		}
 	} // for dim
+
+
+	// check interior lines:
+	unsigned int n_lines = lines.size();
+	for(unsigned int i = 0; i < n_lines; ++i)
+		if( !lines[i].is_in_bounds(newPoint, buffer) )
+		{
+			// std::cout << "checking line: " << i << std::endl;
+			lines[i].reflectPoint(oldPoint, newPoint, buffer);
+			break;
+		}
 
 } // check_boundaries()
 

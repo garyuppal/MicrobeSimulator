@@ -9,6 +9,7 @@ using dealii::Point;
 #include <string>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 #include <boost/archive/basic_archive.hpp>
 #include <boost/property_tree/ptree_serialization.hpp>
@@ -128,7 +129,14 @@ std::vector<std::string> MultiParameterData::set_fixed_parameter_list() const
 
 	if(n_commas == 0)
 	{
-		boost::split(tokens, parameter_list, boost::is_any_of(":"), boost::token_compress_on);
+		std::string paralist = parameter_list;
+		const char chars[] = "{}";
+
+		for (unsigned int i = 0; i < strlen(chars); ++i)
+			paralist.erase (std::remove(paralist.begin(), paralist.end(), 
+				chars[i]), paralist.end());
+		
+		boost::split(tokens, paralist, boost::is_any_of(":"), boost::token_compress_on);
  
  		// assertion still holds here, since n_commas == 0
 		assert(tokens.size() == 3); /** @todo instead, count number of :'s, create lists as needed!

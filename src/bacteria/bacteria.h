@@ -71,7 +71,115 @@ get_bacteria_locations(const Geometry<dim>& geometry, unsigned int number_groups
 	return group_locations;
 }
 
+template<int dim>
+std::vector<Point<dim> > 
+getBoxLocations(const double n_bact, const Point<dim>& bottom_left,
+		const Point<dim>& top_right, const double buffer);
 
+
+template<>
+std::vector<Point<1> > 
+getBoxLocations(double /* n_bact */, const Point<1>& /* bottom_left */,
+		const Point<1>&  /* top_right */, double /* buffer */)
+{
+	throw std::runtime_error("1D box boundary init for bacteria locations not yet implemented");
+}
+
+template<>
+std::vector<Point<2> > 
+getBoxLocations(const double n_bact, const Point<2>& bottom_left,
+		const Point<2>& top_right, const double buffer)
+{
+	std::vector<Point<2> > locations;
+	locations.reserve(n_bact);
+
+	const double lr = top_right[0] - bottom_left[0] - 2.*buffer;
+	const double tb = top_right[1] - bottom_left[1] - 2.*buffer;
+
+	const unsigned int n_lr = std::ceil( n_bact *
+									( lr/(lr + tb) )
+								);
+	const unsigned int n_tb = std::ceil( n_bact *
+									( tb/(lr + tb) )
+								);
+
+	Point<2> temp = bottom_left;
+	temp[0] = temp[0] + buffer;
+	temp[1] = temp[1] + buffer;
+
+	const double dx = lr/n_lr;
+	const double dy = tb/n_tb;
+
+	locations.emplace_back(temp);
+	
+	// bottom
+	for(unsigned int i = 0; i < n_tb; ++i)
+	{
+		temp[0] = temp[0] + dx;
+		locations.emplace_back(temp);
+	}
+
+	// right
+	for(unsigned int i = 0; i < n_lr; ++i)
+	{
+		temp[1] = temp[1] + dy;
+		locations.emplace_back(temp);
+	}
+
+	// top	
+	for(unsigned int i = 0; i < n_lr; ++i)
+	{
+		temp[0] = temp[0] - dx;
+		locations.emplace_back(temp);
+	}
+
+	// left
+	for(unsigned int i = 0; i < n_lr; ++i)
+	{
+		temp[1] = temp[1] - dy;
+		locations.emplace_back(temp);
+	}
+
+	return locations;
+}
+
+template<>
+std::vector<Point<3> > 
+getBoxLocations(double /* n_bact */, const Point<3>& /* bottom_left */,
+		const Point<3>& /* top_right */, double /* buffer */)
+{
+	throw std::runtime_error("3D box boundary init for bacteria locations not yet implemented");
+}
+
+template<int dim>
+std::vector<Point<dim> > 
+getSphereLocations(double n_bact, const std::vector<Sphere<dim> >& spheres,
+	double buffer)
+{
+	if(spheres.size() != 1)
+		throw std::runtime_error("bacteria sphere locations implemented only for 1 sphere");
+
+	const Point<dim> center = spheres[0].getCenter();
+	const double radius = spheres[0].getRadius() - buffer;
+	assert(radius > 0);
+
+	std::vector<Point<dim> > locations;
+	locations.reserve(n_bact);
+
+	const double del_theta = (2.0*dealii::numbers::PI)/n_bact;
+
+	double theta = 0;
+	for(unsigned int i = 0; i < n_bact; ++i)
+	{
+		// assert(dim == 2);
+		theta += del_theta;
+
+		Point<dim> radial( radius*std::cos(theta), radius*std::sin(theta) );
+		locations.emplace_back(center + radial);
+	}
+
+	return locations;
+}
 
 // ------------------------------------------------------------------------------
 // BACTERIUM BASE CLASS
@@ -81,6 +189,8 @@ template<int dim>
 class BacteriumBase{
 public:
 	BacteriumBase(const ParameterHandler& prm, const Point<dim>& p);
+	BacteriumBase(const ParameterHandler& prm, const Point<dim>& p, double cht_rate);
+
 	// BacteriumBase(const Point<dim>& p);
 	// BacteriumBase(const std::vector<double>& rates);
 	// BacteriumBase(const Point<dim>& p, 
@@ -98,11 +208,22 @@ public:
 						const Geometry<dim>& geo,
 						const Velocity::AdvectionHandler<dim>& velocity,
 						double buffer=0); 
+	
+	void move(Point<dim>& temp,
+						double time_step, 
+						double diffusion_constant,
+						const Geometry<dim>& geometry,
+						const Velocity::AdvectionHandler<dim>& velocity,
+						double buffer = 0);
 
 	// modify for intermittent cheaters:
 	virtual double getFitness(const MicrobeSimulator::Bacteria::TestNewFitness::Fitness_Function<dim>& fitness_function) const;
 	virtual std::vector<double> getSecretionRates() const;
 	virtual double getSecretionRate(unsigned int i) const;
+
+	// not used here, but add later
+	virtual std::vector<double> getConsumptionRates() const;
+	virtual double getConsumptionRate(unsigned int i) const;
 
 	// mainly used by intermittent cheaters:
 	virtual void update_state(double dt, 
@@ -122,6 +243,7 @@ public:
 protected:
 	Point<dim> location;
 	std::vector<double> secretion_rates;
+	std::vector<double> consumption_rates; // want to ensure numchem = size vectors
 };
 
 // IMPL
@@ -133,7 +255,21 @@ BacteriumBase<dim>::BacteriumBase(const ParameterHandler& prm, const Point<dim>&
 	const std::string section = "Bacteria.Base";
 
 	secretion_rates = prm.get_double_vector(section,"Secretion rate");
+	consumption_rates = prm.get_double_vector(section,"Consumption rate");
 	location = p;
+}
+
+template<int dim>
+BacteriumBase<dim>::BacteriumBase(const ParameterHandler& prm,
+	const Point<dim>& p, double cht_rate)
+{
+	const std::string section = "Bacteria.Base";
+
+	secretion_rates = prm.get_double_vector(section,"Secretion rate");
+	consumption_rates = prm.get_double_vector(section,"Consumption rate");
+	location = p;
+
+	secretion_rates[0] = cht_rate;	
 }
 
 template<int dim>
@@ -143,7 +279,10 @@ BacteriumBase<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Bacteria");
 		prm.enter_subsection("Base");
 			prm.declare_entry("Secretion rate",
-					"{100,100}",
+					"{0}",
+					Patterns::List(Patterns::Double()));
+			prm.declare_entry("Consumption rate",
+					"{0}",
 					Patterns::List(Patterns::Double()));
 			prm.declare_entry("Number bacteria","0",Patterns::Unsigned());
 		prm.leave_subsection();
@@ -176,6 +315,34 @@ BacteriumBase<dim>::move(double time_step,
 
 	geometry.checkBoundaries(old_location, location, buffer); 
 }
+
+template<int dim>
+void 
+BacteriumBase<dim>::move(Point<dim>& temp,
+						double time_step, 
+						double diffusion_constant,
+						const Geometry<dim>& geometry,
+						const Velocity::AdvectionHandler<dim>& velocity,
+						double buffer)
+{
+	Point<dim> old_location(location);
+
+	const double theta = 2*dealii::numbers::PI*Utility::getRand();
+	const double phi = dealii::numbers::PI*Utility::getRand();
+
+	Point<dim> randomPoint = (dim == 2) ? Point<dim>(std::cos(theta),std::sin(theta))
+	                        : Point<dim>(std::cos(phi), std::sin(phi)*std::cos(theta),
+	                            std::sin(phi)*std::sin(theta));
+
+	location += std::sqrt(2*dim*time_step*diffusion_constant)*randomPoint
+	    + time_step*velocity.value(location);
+
+	// before checking boundaries:
+	    temp = location;
+	geometry.checkBoundaries(old_location, location, buffer); 
+}
+
+
 
 template<int dim>
 double 
@@ -245,6 +412,21 @@ BacteriumBase<dim>::getSecretionRate(unsigned int i) const
 {
 	assert(i < secretion_rates.size());
 	return secretion_rates[i];
+}
+
+template<int dim>
+std::vector<double> 
+BacteriumBase<dim>::getConsumptionRates() const
+{
+	return consumption_rates;
+}
+
+template<int dim>
+double 
+BacteriumBase<dim>::getConsumptionRate(unsigned int i) const
+{
+	assert(i < consumption_rates.size());
+	return consumption_rates[i];
 }
 
 template<int dim>
@@ -415,12 +597,111 @@ PICBacterium<dim>::print(std::ostream& out) const
 
 
 
-
-
 // ***************
 // also add:
 // - stochastic switching
 // - feedback switching (history dependent with integration kernel, c.f chemotaxis)
+
+
+
+// // ------------------------------------------------------------------------------
+// // AGING CELLS
+// // ------------------------------------------------------------------------------
+// /** \brief Intermittently cheating bacteria */
+// template<int dim>
+// class AgingCells : public BacteriumBase<dim>{
+// public:
+// 	AgingCells(const ParameterHandler& prm, const Point<dim>& p);
+
+// 	static void declare_parameters(ParameterHandler& prm);
+
+// 	std::unique_ptr<BacteriumBase<dim> > clone() const override;
+
+// 	// // modify for intermittent cheaters:
+// 	// double getFitness(const Bacteria::TestNewFitness::Fitness_Function<dim>& fitness_function) const override;
+// 	// std::vector<double> getSecretionRates() const override;
+// 	// double getSecretionRate(unsigned int i) const override;
+
+// 	// // mainly used by intermittent cheaters:
+// 	// void update_state(double dt, 
+// 	// 	const RefactoredChemicals::ChemicalHandler<dim>& chemicals) override; 
+	
+// 	// make this easier to control later, associate which chems correspond
+// 	// to which rates and fitness...
+// 	std::vector<double> getConsumptionRates() const override;
+// 	double getConsumptionRates(unsigned int i) const override;
+// 	void print(std::ostream& out) const override;
+
+// private:
+// 	// inherited:
+// 	// Point<dim> location;
+// 	// std::vector<double> secretion_rates;	
+
+// 	double consumption_rate;
+// };
+
+// // IMPL
+// // ------------------------------------------------------------------------------
+// template<int dim>
+// AgingCells<dim>::AgingCells(const ParameterHandler& prm, const Point<dim>& p)
+// 	:
+// 	BacteriumBase<dim>(prm, p)
+// {
+// 	const std::string section = "Bacteria.AgingCells";
+
+// 	this->secretion_rates = prm.get_double_vector(section,"Secretion rate");
+// 	consumption_rate = prm.get_double(section, "Consumption rate");
+// 	this->location = p;
+// }
+
+// template<int dim>
+// void 
+// AgingCells<dim>::declare_parameters(ParameterHandler& prm)
+// {
+// 	prm.enter_subsection("Bacteria");
+// 		prm.enter_subsection("AgingCells");
+// 			prm.declare_entry("Secretion rate",
+// 					"{0}",
+// 					Patterns::List(Patterns::Double()));
+// 			prm.declare_entry("Number bacteria","0",Patterns::Unsigned());
+// 			prm.declare_entry("Consumption rate","0",Patterns::Double());
+// 		prm.leave_subsection();
+// 	prm.leave_subsection();
+// }
+
+// template<int dim>
+// std::unique_ptr<BacteriumBase<dim> > 
+// AgingCells<dim>::clone() const
+// {
+// 	return std::unique_ptr<BacteriumBase<dim> >(
+// 			new AgingCells(*this) );
+// }
+
+// template<int dim>
+// std::vector<double> 
+// AgingCells<dim>::getConsumptionRates() const
+// {
+// 	return std::vector<double>(1, consumption_rate);
+// }
+
+// template<int dim>
+// double 
+// AgingCells<dim>::getConsumptionRates(unsigned int i) const
+// {
+// 	assert(i < 1);
+// 	return consumption_rate;
+// }
+
+// template<int dim>
+// void 
+// AgingCells<dim>::print(std::ostream& out) const
+// {
+// 	out << this->location << " ";
+// 	for(unsigned int i = 0; i < this->secretion_rates.size()-1; ++i)
+// 		out << this->secretion_rates[i] << " ";
+// 	out << this->secretion_rates[this->secretion_rates.size()-1] << " ";
+// 	out << consumption_rate;
+// }
 
 
 
@@ -464,6 +745,9 @@ public:
 	std::vector<double> 			getAllRates(unsigned int index) const;
 	std::vector<std::vector<double> > getAllRates() const;
 
+	std::vector<double> 			getAllConsumptionRates(unsigned int index) const;
+	std::vector<std::vector<double> > getAllConsumptionRates() const;
+
 	std::vector<double> get_pg_rates();
 
 	bool isAlive() const;
@@ -490,6 +774,9 @@ private:
 		double right_edge, std::vector<double>& pg_rates, int direction);
 
 	void add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo); 
+	void add_bacteria_groups(const ParameterHandler& prm, const Geometry<dim>& geo); 
+	void add_boundary_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo); 
+
 		// mixing all types for now
 };
 
@@ -513,6 +800,7 @@ Bacteria<dim>::declare_parameters(ParameterHandler& prm)
 {
 	prm.enter_subsection("Bacteria");
 		// prm.declare_entry("Number bacteria","100",Patterns::Unsigned());
+		prm.declare_entry("Init type","Groups",Patterns::Selection("Groups|Boundary"));
 		prm.declare_entry("Number groups","1",Patterns::Unsigned());
 		prm.declare_entry("Initial growth time","-1",Patterns::Double()); // add delays instead...
 		prm.declare_entry("Diffusion","0.1",Patterns::Double());
@@ -529,6 +817,9 @@ Bacteria<dim>::declare_parameters(ParameterHandler& prm)
 		prm.declare_entry("Deterministic number mutate","0",Patterns::Unsigned());
 		prm.declare_entry("Deterministic mutate time","0",Patterns::Double());
 		prm.declare_entry("Deterministic mutation strength","10000",Patterns::Double());
+
+		prm.declare_entry("Number cheating groups","0",Patterns::Unsigned());
+		prm.declare_entry("Cheating group secretion","0",Patterns::Double());
 		
 		prm.declare_entry("Initial locations",
 							"{{}}",
@@ -544,6 +835,7 @@ Bacteria<dim>::declare_parameters(ParameterHandler& prm)
 	// declare parameters for each type:
 	BacteriumBase<dim>::declare_parameters(prm);
 	PICBacterium<dim>::declare_parameters(prm);
+	// AgingCells<dim>::declare_parameters(prm);
 }
 
 template<int dim>
@@ -568,6 +860,8 @@ Bacteria<dim>::init(const ParameterHandler& prm, const Geometry<dim>& geo)
 		prm.get_unsigned(section + ".Base", "Number bacteria");
 	const unsigned int n_bact_PIC = 
 		prm.get_unsigned(section + ".PIC", "Number bacteria");
+	// const unsigned int n_aging = 
+	// 	prm.get_unsigned(section + ".AgingCells", "Number bacteria");
 	bacteria.clear();
 	bacteria.reserve(n_bact_base + n_bact_PIC);
 
@@ -586,19 +880,96 @@ void
 Bacteria<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo)
 {
 	const std::string section = "Bacteria";
+	const std::string type = prm.get(section, "Init type");
+
+	if( boost::iequals(type, "Groups") )
+	{
+		add_bacteria_groups(prm, geo);
+	}
+	else if( boost::iequals(type, "Boundary") ) 
+	{
+		add_boundary_bacteria(prm, geo);
+	}
+	else
+	{
+		throw std::runtime_error("<" + type + "> is invalid Init type for bacteria");
+	}
+}
+
+template<int dim>
+void 
+Bacteria<dim>::add_boundary_bacteria(const ParameterHandler& prm, const Geometry<dim>& geo)
+{
+	const std::string section = "Bacteria";
+
+	const unsigned int n_bact_base = 
+		prm.get_unsigned(section + ".Base", "Number bacteria");
+	const unsigned int n_bact_PIC = 
+		prm.get_unsigned(section + ".PIC", "Number bacteria");
+	// const unsigned int n_aging = 
+	// 	prm.get_unsigned(section + ".AgingCells", "Number bacteria");
+	const unsigned int n_bact = n_bact_base + n_bact_PIC; // + n_aging;
+		
+	// get number of exterior spheres and bounding boxes
+	// if no spheres, only allocate to box, else evenly to spheres
+	// only 2d for now...
+
+	std::vector<Sphere<dim> > sps = geo.getSpheres();
+	unsigned int n_ext_sp = 0;
+	for(unsigned int i = 0; i < sps.size(); ++i)
+		if( sps[i].getObstacleType() == ObstacleType::EXTERIOR )
+			++n_ext_sp;
+
+	std::vector<Point<dim> > locations;
+	if(n_ext_sp == 0)
+		locations = getBoxLocations(n_bact, 
+									geo.getBottomLeftPoint(),
+									geo.getTopRightPoint(),
+									edge_buffer);
+	else
+		locations = getSphereLocations(n_bact,
+										sps,
+										edge_buffer);
+
+	// for each type:
+	unsigned int p_ind = 0;
+	// add Base bacteria
+	for(unsigned int i = 0; i < n_bact_base; ++i)
+	{
+		bacteria.emplace_back(new BacteriumBase<dim>(prm, locations[p_ind]));
+		++p_ind;
+	}
+
+	// add PIC bacteria
+	for(unsigned int i = 0; i < n_bact_PIC; ++i)
+	{
+		bacteria.emplace_back(new PICBacterium<dim>(prm, locations[p_ind]));
+		++p_ind;
+	}	
+}
+
+template<int dim>
+void 
+Bacteria<dim>::add_bacteria_groups(const ParameterHandler& prm, const Geometry<dim>& geo)
+{
+	const std::string section = "Bacteria";
 
 	unsigned int number_groups = prm.get_unsigned(section, "Number groups");
 	std::vector<Point<2> > initial_locations = 
 		prm.get_point_list(section, "Initial locations");
 
+	const unsigned int n_bact_base = 
+		prm.get_unsigned(section + ".Base", "Number bacteria");
+	const unsigned int n_bact_PIC = 
+		prm.get_unsigned(section + ".PIC", "Number bacteria");
+	// const unsigned int n_aging = 
+	// 	prm.get_unsigned(section + ".AgingCells", "Number bacteria");
+
 	if(initial_locations.empty()) // if not given from parameters
 	{
-		if(number_groups == 0){
-			const unsigned int n_bact_base = 
-				prm.get_unsigned(section + ".Base", "Number bacteria");
-			const unsigned int n_bact_PIC = 
-				prm.get_unsigned(section + ".PIC", "Number bacteria");
-			number_groups = n_bact_base + n_bact_PIC;
+		if(number_groups == 0)
+		{
+			number_groups = n_bact_base + n_bact_PIC; // + n_aging;
 		}
 		
 		const double left_start_width = prm.get_double(section, "Left start width");
@@ -609,11 +980,8 @@ Bacteria<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& ge
 			edge_buffer, left_start_width, left_start_buffer, y_start_buffer);
 	}
 
-	const unsigned int n_bact_base = 
-		prm.get_unsigned(section + ".Base", "Number bacteria");
-	const unsigned int n_bact_PIC = 
-		prm.get_unsigned(section + ".PIC", "Number bacteria");
-	// const unsigned int n_bact = n_bact_base + n_bact_PIC;
+	const unsigned int n_cheating_groups = prm.get_unsigned(section,"Number cheating groups");
+	const double cheating_rate = prm.get_double(section,"Cheating group secretion");
 
 	// add Base bacteria
 	for(unsigned int i = 0; i < n_bact_base; ++i)
@@ -621,7 +989,10 @@ Bacteria<dim>::add_bacteria(const ParameterHandler& prm, const Geometry<dim>& ge
 		unsigned int group_index = i % number_groups;	
 		Point<dim> location = initial_locations[group_index];
 
-		bacteria.emplace_back(new BacteriumBase<dim>(prm, location));
+		if( group_index < n_cheating_groups)
+			bacteria.emplace_back(new BacteriumBase<dim>(prm, location, cheating_rate));
+		else
+			bacteria.emplace_back(new BacteriumBase<dim>(prm, location));
 	}	
 
 	// add PIC bacteria
@@ -640,9 +1011,32 @@ Bacteria<dim>::move(double dt,
 			const Geometry<dim>& geometry,
 			const Velocity::AdvectionHandler<dim>& velocity)
 {
-	for(unsigned int i = 0; i < bacteria.size(); ++i)
-		bacteria[i]->move(dt, diffusion_constant, 
-			geometry, velocity, edge_buffer);
+	// remove this check later!!! vvv
+		// static int ssn_move = 1;
+		// std::vector<Point<dim> > attempted_points;
+		// attempted_points.reserve(bacteria.size());
+
+		// Point<dim> temp; 
+		for(unsigned int i = 0; i < bacteria.size(); ++i)
+		{
+			// bacteria[i]->move(temp, dt, diffusion_constant, 
+			// 	geometry, velocity, edge_buffer); // keep only this
+
+			bacteria[i]->move(dt, diffusion_constant, 
+				geometry, velocity, edge_buffer); // keep only this
+
+			// attempted_points.emplace_back(temp);
+		}
+
+		// std::string outfile = "./trial_move_bacteria_"
+		// 			+ dealii::Utilities::int_to_string(ssn_move,6)
+		// 			+ ".dat";
+		// std::ofstream out(outfile);
+		// for(unsigned int i = 0; i < attempted_points.size(); ++i)
+		// 	out << attempted_points[i] << std::endl;
+
+		// ssn_move++;
+	// ^^^ remove above later
 
 	const int direction = velocity.get_direction();
 	// if boundary is open, remove fallen bacteria:
@@ -877,6 +1271,42 @@ Bacteria<dim>::getAllRates() const
 
 	return all_rates;
 }
+
+template<int dim>
+std::vector<double>
+Bacteria<dim>::getAllConsumptionRates(unsigned int index) const
+{
+	std::vector<double> all_comp_rates;
+
+	all_comp_rates.reserve(bacteria.size());
+
+	for(unsigned int i = 0; i < bacteria.size(); ++i)
+		all_comp_rates.emplace_back(bacteria[i]->getConsumptionRate(index));
+
+	return all_comp_rates;
+}
+
+template<int dim>
+std::vector<std::vector<double> > 
+Bacteria<dim>::getAllConsumptionRates() const
+{
+	std::vector<std::vector<double> > all_comp_rates;
+
+	if(bacteria.empty())
+	{
+		all_comp_rates.clear();
+		return all_comp_rates;
+	}
+
+	const unsigned int num_chem = bacteria[0]->getConsumptionRates().size();
+
+	all_comp_rates.reserve(num_chem);
+	for(unsigned int c = 0; c < num_chem; ++c)
+		all_comp_rates.emplace_back(getAllConsumptionRates(c));
+
+	return all_comp_rates;
+}
+
 
 /** \brief Return public good secretion rates of captured bacteria */
 template<int dim>

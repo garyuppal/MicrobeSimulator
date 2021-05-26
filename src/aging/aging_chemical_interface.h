@@ -34,9 +34,9 @@ public:
 	// updating methods:
 
 	virtual void update(const std::vector<Point<dim> >& source_locations, 
-						const std::vector<double>& sources,
+						double sources,
 						const std::vector<Point<dim> >& sink_locations, 
-						const std::vector<double>& sinks) = 0;
+						double sinks) = 0;
 
 	// // no secretion:
 	// virtual void update() = 0;

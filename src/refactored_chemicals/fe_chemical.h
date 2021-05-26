@@ -1,5 +1,4 @@
-#ifndef MICROBE_SIMULATOR_REFACTORED_FE_CHEMICAL_H
-#define MICROBE_SIMULATOR_REFACTORED_FE_CHEMICAL_H
+#pragma once
 
 #include <deal.II/base/timer.h>
 
@@ -56,6 +55,12 @@ public:
 							const std::vector<double>& amounts,
 							const Function<dim>& control_function) override;
 
+	void update(const SourcesAndSinks<dim>& ss) override;
+
+	void update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<double>& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<double>& sinks) override;
 	// accessors:
 	// double 	getDiffusionConstant() const; // done(inherited)
 	// double 	getDecayConstant() const; // done (inherited)
@@ -126,8 +131,19 @@ private:
 	void	update_rhs(const std::vector<Point<dim> >& locations, 
 					const std::vector<double>& amounts,
 					const Function<dim>& control_function);
+	void 	update_rhs(const std::vector<Point<dim> >& source_locations, 
+					const std::vector<double>& sources,
+					const std::vector<Point<dim> >& sink_locations, 
+					const std::vector<double>& sinks);
+
 	void 	update_source_vector(const std::vector<Point<dim> >& locations, 
 										const std::vector<double>& amounts); // done
+
+	void 	update_source_vector(const std::vector<Point<dim> >& source_locations, 
+					const std::vector<double>& sources,
+					const std::vector<Point<dim> >& sink_locations, 
+					const std::vector<double>& sinks);
+
 	void 	solve(); // done
 };
 
@@ -248,6 +264,31 @@ FE_Chemical<dim>::update(const std::vector<Point<dim> >& locations,
 
 	old_solution = solution;	
 }
+
+template<int dim>
+void 
+FE_Chemical<dim>::update(const SourcesAndSinks<dim>& /*ss*/) 
+{
+	throw std::runtime_error("update via SourcesAndSinks not implemented");
+	// update_sources(ss.getSources());
+	// update_sinks(ss.getSinks());
+
+	// solve();
+	// old_solution = solution;
+}
+
+template<int dim>
+void 
+FE_Chemical<dim>::update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<double>& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<double>& sinks)
+{
+	update_rhs(source_locations, sources, sink_locations, sinks);
+	solve();
+
+	old_solution = solution;	
+}					
 
 
 // ACCESSORS: (inherited or not in interface... remove)
@@ -371,6 +412,64 @@ FE_Chemical<dim>::update_rhs(const std::vector<Point<dim> >& locations,
 	right_hand_side.add(this->time_step, control_function_fem_vector);
 }
 
+template<int dim>
+void 	
+FE_Chemical<dim>::update_rhs(const std::vector<Point<dim> >& source_locations, 
+				const std::vector<double>& sources,
+				const std::vector<Point<dim> >& sink_locations, 
+				const std::vector<double>& sinks)
+{
+	update_rhs(); // RHS = MU^{k-1}
+	update_source_vector(source_locations, sources, sink_locations, sinks);
+	right_hand_side.add(this->time_step, source); // RHS += k*S
+}
+
+template<int dim>
+void 	
+FE_Chemical<dim>::update_source_vector(const std::vector<Point<dim> >& source_locations, 
+				const std::vector<double>& sources,
+				const std::vector<Point<dim> >& sink_locations, 
+				const std::vector<double>& sinks)
+{
+	// source = 0;
+	// update source part first:
+	update_source_vector(source_locations, sources);
+
+	const double scale_factor = 0.0016; //***remove this
+	const unsigned int number_bacteria = sink_locations.size();
+
+	const unsigned int dofs_per_cell = chemical_base->get_fe().dofs_per_cell;
+	std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+
+	// loop over bacteria:
+	for(unsigned int i = 0; i < number_bacteria; ++i)
+	{
+		std::pair<typename DoFHandler<dim>::active_cell_iterator, Point<dim> >
+		cell_point = 
+			chemical_base->getPointCellMap()->get_cell_point_pair(sink_locations[i]);
+
+		Quadrature<dim> q(GeometryInfo<dim>::project_to_unit_cell(cell_point.second));
+
+		FEValues<dim> fe_values(StaticMappingQ1<dim>::mapping, 
+				                chemical_base->get_dof_handler().get_fe(),
+				                q, 
+				                UpdateFlags(update_values));
+
+		fe_values.reinit(cell_point.first);
+
+		cell_point.first->get_dof_indices (local_dof_indices);
+
+		for (unsigned int j=0; j<dofs_per_cell; ++j)
+			source(local_dof_indices[j]) += //check ***
+				scale_factor*(-sinks[i])*( this->value(sink_locations[i])/*value here*/
+					)*fe_values.shape_value(j,0);
+		// chemical_base->get_constraints().distribute_local_to_global(cell_matrix,
+		// 					                                local_dof_indices,
+		// 					                                system_matrix);
+
+	}
+
+}
 
 template<int dim>
 void
@@ -756,4 +855,4 @@ FE_Chemical<dim>::process_solution(ConvergenceTable& convergence_table,
 }
 
 }} // close namespace
-#endif
+/* fe_chemical.h */

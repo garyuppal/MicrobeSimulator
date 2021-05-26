@@ -47,9 +47,9 @@ public:
 	// 					const Function<dim>& control_function) override;
 
 	void update(const std::vector<Point<dim> >& source_locations, 
-					const std::vector<double>& sources,
+					double sources,
 					const std::vector<Point<dim> >& sink_locations, 
-					const std::vector<double>& sinks) override;
+					double sinks) override;
 
 
 	// integrate field over total volume 
@@ -86,9 +86,9 @@ private:
 	void updateDiffusion();
 	void updateAdvection();
 	void updateSources(const std::vector<Point<dim> >& locations, 
-						const std::vector<double>& amounts); 
+						double amounts); 
 	void updateSinks(const std::vector<Point<dim> >& locations, 
-						const std::vector<double>& amounts); 
+						double amounts); 
 	void updateControls(const Function<dim>& control_function); 
 
 	void addAux();
@@ -391,7 +391,7 @@ AgingChemical<3>::updateAdvection()
 template<int dim>
 void 
 AgingChemical<dim>::updateSources(const std::vector<Point<dim> >& locations, 
-						const std::vector<double>& amounts)
+						double amounts)
 {
 	double idv = 1.; // divide by cell volume to scale with resolution
 
@@ -399,13 +399,13 @@ AgingChemical<dim>::updateSources(const std::vector<Point<dim> >& locations,
 		idv *= auxiliary.getInverseCellWidth(dim_itr);
 
 	for(unsigned int i = 0; i < locations.size(); ++i)
-		auxiliary.at(locations[i]) += idv*amounts[i]; 
+		auxiliary.at(locations[i]) += idv*amounts; 
 }
 
 template<int dim>
 void 
 AgingChemical<dim>::updateSinks(const std::vector<Point<dim> >& locations, 
-						const std::vector<double>& amounts)
+						double amounts)
 {
 	double idv = 1.; // divide by cell volume to get density
 
@@ -414,7 +414,7 @@ AgingChemical<dim>::updateSinks(const std::vector<Point<dim> >& locations,
 
 	// subtract from auxilliary consumnption amount times local concentration
 	for(unsigned int i = 0; i < locations.size(); ++i)
-		auxiliary.at(locations[i]) += -idv*amounts[i]*(chemical.at(locations[i]));
+		auxiliary.at(locations[i]) += -idv*amounts*(chemical.at(locations[i]));
 									// {  gamma * n  }* {   phi[i]   } 
 }
 
@@ -526,9 +526,9 @@ AgingChemical<dim>::ensure_positive()
 template<int dim>
 void 
 AgingChemical<dim>::update(const std::vector<Point<dim> >& source_locations, 
-				const std::vector<double>& sources,
+				double sources,
 				const std::vector<Point<dim> >& sink_locations, 
-				const std::vector<double>& sinks)
+				double sinks)
 {
 	updateDiffusion();
 	updateAdvection();

@@ -1,5 +1,4 @@
-#ifndef MICROBE_SIMULATOR_BACTERIA_FITNESS_TYPES_H
-#define MICROBE_SIMULATOR_BACTERIA_FITNESS_TYPES_H
+#pragma once
 
 #include <deal.II/base/point.h>
 using dealii::Point;
@@ -200,6 +199,29 @@ namespace MicrobeSimulator{ namespace Bacteria{
 
 namespace TestNewFitness{
 
+template<class T>
+void
+print_list(std::ostream& out, const std::vector<T>& list)
+{
+	if(list.empty())
+	{
+		out << std::endl;
+	}
+	else if( list.size() == 1)
+	{
+		out << list[0] << std::endl;
+	}
+	else
+	{
+		const unsigned int n = list.size()-1;
+
+		for(unsigned int i = 0; i < n; ++i)
+	    	out << list[i] << ", ";
+	    out << list[n] << std::endl;
+    }
+}
+    
+    
 // ---------------------------------------------------------------------------------
 // FITNESS BASE: 
 // ---------------------------------------------------------------------------------
@@ -455,6 +477,259 @@ AND_Fitness<dim>::printInfo(std::ostream& out) const
 		<< std::endl << std::endl << std::endl;
 }
 
+// --------------------------------------------------------------------------------
+// AGING FITNESS:
+// --------------------------------------------------------------------------------
+template<int dim>
+class Aging_Fitness : public FitnessBase<dim>{
+public:
+	Aging_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
+			const ParameterHandler& prm);
+	
+	static void declare_parameters(ParameterHandler& prm);
+	
+	double value(const Point<dim>& location,
+			const std::vector<double>& rates) const override;
+
+	void printInfo(std::ostream& out) const override;
+private:
+	double death_rate;
+	double threshold;
+	double hill_constant; // can make vectors
+};
+
+// IMPL
+// ----------------------------------------------------------
+
+/** \brief AGING type fitness constructor */
+template<int dim>
+Aging_Fitness<dim>::Aging_Fitness(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
+		const ParameterHandler& prm)
+	:
+	FitnessBase<dim>(ch)
+{
+	std::string subsection = "Fitness.Aging";
+
+	death_rate = prm.get_double(subsection, "Death rate");
+	threshold = prm.get_double(subsection, "Threshold");
+	hill_constant = prm.get_double(subsection, "Hill constant");
+}
+
+/** \brief Declare AND fitness type parameters */
+template<int dim>
+void 
+Aging_Fitness<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Fitness");
+		prm.enter_subsection("Aging");
+			prm.declare_entry("Death rate","0",Patterns::Double());
+			prm.declare_entry("Threshold","1",Patterns::Double());
+			prm.declare_entry("Hill constant","1",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+template<int dim>
+double 
+Aging_Fitness<dim>::value(const Point<dim>& location,
+			const std::vector<double>& /*rates*/) const
+{
+	const double phi = (*this->chemicals)[0].value(location); 
+		// should be prop to actual amount consumed...
+
+	return -death_rate*( std::pow(threshold,hill_constant) /
+		( std::pow(threshold,hill_constant) + std::pow(phi,hill_constant) )
+		);
+}
+
+template<int dim>
+void 
+Aging_Fitness<dim>::printInfo(std::ostream& out) const
+{
+	const unsigned int numchem = this->chemicals->getNumberChemicals();
+
+	out << "\n\n" << Utility::medium_line << std::endl
+	    << "\t\t AGING FITNESS FUNCTION (for " << numchem << " chemicals)" << std::endl
+	    << Utility::medium_line << std::endl
+	    << "\t death rate: " << death_rate << std::endl
+	    << "\t threshold: " << threshold << std::endl
+	    << "\t hill constant: " << hill_constant << std::endl
+		<< Utility::medium_line
+		<< std::endl << std::endl << std::endl;
+}
+
+
+// --------------------------------------------------------------------------------
+// MULTI CHEM AGING FITNESS:
+// --------------------------------------------------------------------------------
+template<int dim>
+class Multi_Aging : public FitnessBase<dim>{
+public:
+	Multi_Aging(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
+			const ParameterHandler& prm);
+	
+	static void declare_parameters(ParameterHandler& prm);
+	
+	double value(const Point<dim>& location,
+			const std::vector<double>& rates) const override;
+
+	void printInfo(std::ostream& out) const override;
+private:
+	unsigned int n_pos, n_neg;
+	std::vector<double> pos_coefs;
+	std::vector<double> neg_coefs;
+	std::vector<double> pos_sats;
+	std::vector<double> neg_sats;
+	std::vector<double> pos_hills;
+	std::vector<double> neg_hills;
+	double constant;
+
+	void check_dimensions() const;
+};
+
+// IMPL
+// ----------------------------------------------------------
+
+/** \brief Multi aging fitness type constructor */
+template<int dim>
+Multi_Aging<dim>::Multi_Aging(const RefactoredChemicals::ChemicalHandler<dim>& ch, 
+		const ParameterHandler& prm)
+	:
+	FitnessBase<dim>(ch)
+{
+	std::string section = "Fitness.Multi Aging";
+
+	n_pos = prm.get_unsigned(section,"Number CFs");
+	n_neg = prm.get_unsigned(section, "Number toxins");
+
+	pos_coefs = prm.get_double_vector(section,"CF coefs");
+	neg_coefs = prm.get_double_vector(section, "Toxin coefs");
+	pos_sats = prm.get_double_vector(section, "Benefit saturation");
+	neg_sats = prm.get_double_vector(section, "Harm saturation");
+	pos_hills = prm.get_double_vector(section, "Benefit hill");
+	neg_hills = prm.get_double_vector(section, "Harm hill");
+	constant = prm.get_double(section, "Constant");
+
+	check_dimensions();
+}
+
+template<int dim>
+void
+Multi_Aging<dim>::check_dimensions() const
+{
+	assert( pos_coefs.size() == n_pos );
+	assert( pos_sats.size() == n_pos );
+	assert( pos_hills.size() == n_pos );
+
+	assert( neg_coefs.size() == n_neg );
+	assert( neg_sats.size() == n_neg );
+	assert( neg_hills.size() == n_neg );
+}
+
+/** \brief Declare AND fitness type parameters */
+template<int dim>
+void 
+Multi_Aging<dim>::declare_parameters(ParameterHandler& prm)
+{
+	prm.enter_subsection("Fitness");
+		prm.enter_subsection("Multi Aging");
+			prm.declare_entry("Number CFs", "0", Patterns::Unsigned());
+			prm.declare_entry("Number toxins", "0", Patterns::Unsigned());
+			prm.declare_entry("CF coefs","{0}", Patterns::List(Patterns::Double()));
+			prm.declare_entry("Toxin coefs","{0}", Patterns::List(Patterns::Double()));
+			prm.declare_entry("Benefit saturation","{0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Harm saturation","{0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Benefit hill","{0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Harm hill","{0}",Patterns::List(Patterns::Double()));
+			prm.declare_entry("Constant","0",Patterns::Double());
+		prm.leave_subsection();
+	prm.leave_subsection();
+}
+
+template<int dim>
+double 
+Multi_Aging<dim>::value(const Point<dim>& location,
+			const std::vector<double>& /*rates*/) const
+{
+	double fit = 0.;
+
+	// chemicals ordered so benefits first, negs later
+	for(unsigned int i = 0; i < n_pos; ++i)
+	{
+		const double chem = std::pow( (*this->chemicals)[i].value(location), pos_hills[i]);
+		fit += pos_coefs[i]*(
+			 	std::pow(pos_sats[i],pos_hills[i])/
+				( chem + std::pow(pos_sats[i],pos_hills[i]) ) 
+			);
+	}
+
+	for(unsigned int i = 0; i < n_neg; ++i)
+	{
+		const double chem = std::pow( (*this->chemicals)[i + n_pos].value(location), neg_hills[i]);
+		fit += neg_coefs[i]*(
+			 	std::pow(neg_sats[i],neg_hills[i])/
+				( chem + std::pow(neg_sats[i],neg_hills[i]) ) 
+			);
+	}
+
+	return -fit + constant;
+}
+
+template<int dim>
+void 
+Multi_Aging<dim>::printInfo(std::ostream& out) const
+{
+	out << "\n\n" << Utility::medium_line << std::endl
+	    << "\t\tMULTI AGING FITNESS (for " << n_pos << " CFS and " 
+	    		<< n_neg << " toxins)" << std::endl
+	    << Utility::medium_line << std::endl;
+	    
+    out << "\t public good benefits: ";
+    print_list(out, pos_coefs);
+
+    // for(unsigned int i = 0; i < (n_pos-1); ++i)
+    // 	out << pos_coefs[i] << ", ";
+    // out << pos_coefs[n_pos-1] << std::endl;
+
+    out << "\t public good saturation constants: ";
+    print_list(out, pos_sats);
+
+    // for(unsigned int i = 0; i < (n_pos-1); ++i)
+    // 	out << pos_sats[i] << ", ";
+    // out << pos_sats[n_pos-1] << std::endl;
+
+    out << "\t public good hill constants: ";
+    print_list(out, pos_hills);
+
+    // for(unsigned int i = 0; i < (n_pos-1); ++i)
+    // 	out << pos_hills[i] << ", ";
+    // out << pos_hills[n_pos-1] << std::endl;
+
+    out << "\t toxin coefficients: ";
+    print_list(out, neg_coefs);
+
+    // for(unsigned int i = 0; i < (n_neg-1); ++i)
+    // 	out << neg_coefs[i] << ", ";
+    // out << neg_coefs[n_neg-1] << std::endl;
+
+    out << "\t toxin saturation constants: ";
+    print_list(out, neg_sats);
+
+    // for(unsigned int i = 0; i < (n_neg-1); ++i)
+    // 	out << neg_sats[i] << ", ";
+    // out << neg_sats[n_neg-1] << std::endl;
+
+    out << "\t toxin hill constants: ";
+    print_list(out, neg_hills);
+    
+    // for(unsigned int i = 0; i < (n_neg-1); ++i)
+    // 	out << neg_hills[i] << ", ";
+    // out << neg_hills[n_neg-1] << std::endl;
+
+	out << "\t constant: " << constant << std::endl;
+	out << Utility::medium_line
+		<< std::endl << std::endl << std::endl;
+}
 
 // ---------------------------------------------------------------------------------
 // FITNESS HANDLER:
@@ -500,6 +775,10 @@ Fitness_Function<dim>::init(const ParameterHandler& prm,
 		fitness = std::make_shared<OR_Fitness<dim> >(ch, prm);
 	else if( boost::iequals(fitness_type, "AND") )
 		fitness = std::make_shared<AND_Fitness<dim> >(ch, prm);
+	else if( boost::iequals(fitness_type, "Aging") )
+		fitness = std::make_shared<Aging_Fitness<dim> >(ch, prm);
+	else if( boost::iequals(fitness_type, "Multi Aging") )
+		fitness = std::make_shared<Multi_Aging<dim> >(ch, prm);
 	else
 		throw std::runtime_error("Invalid fitness type: <" + fitness_type + ">");
 }
@@ -515,6 +794,8 @@ Fitness_Function<dim>::declare_parameters(ParameterHandler& prm)
 
 	OR_Fitness<dim>::declare_parameters(prm);
 	AND_Fitness<dim>::declare_parameters(prm);
+	Aging_Fitness<dim>::declare_parameters(prm);
+	Multi_Aging<dim>::declare_parameters(prm);
 }
 
 /** \brief Return fitness function value at given location for given secretion rates */
@@ -545,4 +826,4 @@ Fitness_Function<dim>::printInfo(std::ostream& out) const
 
 
 }} // CLOSE NAMESPACE
-#endif
+/* bacteria_fitness.h */

@@ -169,6 +169,10 @@ public:
 	virtual void refine_global(Triangulation<dim>& tria);
 	virtual void refine_largest_cells(Triangulation<dim>& tria);
 
+	// adding buffers: (only for bowtie so far...)
+	std::vector<double> 
+		getBufferYDivisions() const {return buffer_y_divisions;}
+
 	void printMeshInfo(std::ostream& out) const;
 
 protected:
@@ -178,6 +182,8 @@ protected:
 
 	double sphere_tolerance;
 	double max_cell_size;
+
+	std::vector<double> buffer_y_divisions;
 };
 
 // IMPL
@@ -1880,7 +1886,7 @@ Funnel<dim>::build_and_attach_right_side(Triangulation<dim>& tria) const
 	Triangulation<2> aux;
 
 	const double width = left_length + center_length + right_length;
-	// const double half_difference = 0.5*(std::fabs(left_height - right_height));
+	const double half_difference = 0.5*(std::fabs(left_height - right_height));
 	const double quarter_difference = 0.5*half_difference;
 
 	std::vector<double> x_divisions, y_divisions;
@@ -1891,7 +1897,7 @@ Funnel<dim>::build_and_attach_right_side(Triangulation<dim>& tria) const
 	x_divisions.emplace_back(hcl); // includes middle portion
 	x_divisions.emplace_back(hcl); 
 
-	// x_divisions.emplace_back(right_length); // further divide this if right length is larger than half center
+	x_divisions.emplace_back(right_length); // further divide this if right length is larger than half center //?
 	if(right_length > hcl)
 	{
 		const double n_x_divs = std::round(right_length/hcl);
@@ -1903,10 +1909,10 @@ Funnel<dim>::build_and_attach_right_side(Triangulation<dim>& tria) const
 	else
 	{
 		x_divisions.emplace_back(right_length); 
-	} /** @todo may want to futher divide if right is much less than half center */
+	} // @todo may want to futher divide if right is much less than half center 
 
 
-	// y_divisions.emplace_back(right_height);
+	y_divisions.emplace_back(right_height); //?
 	if(right_height > quarter_difference)
 	{
 		const double n_divs = std::round(right_height/quarter_difference);
@@ -2001,7 +2007,7 @@ Funnel<dim>::printInfo(std::ostream& out) const
 // // -------------------------------------------------------------------------------
 // // 		BOWTIE:
 // // -------------------------------------------------------------------------------
-// /** \brief Class to construct BowTie type geometry */
+// /** \brief Class to construct BowTie type geometry 
 // /** Inherits from Funnel, making use of most of the same methods, and just adding 
 // * geometry on right side.
 // */
@@ -2362,7 +2368,36 @@ BowTie<dim>::BowTie(const ParameterHandler& prm)
 	}
 
 	half_difference = 0.5*(std::fabs(edge_height - pinch_height));	
-}
+
+	// set y divisions
+	{
+		// set step sizes:
+		std::vector<double> y_divisions;
+
+		const double quarter_difference = 0.5*half_difference;
+		y_divisions.emplace_back(quarter_difference);
+		y_divisions.emplace_back(quarter_difference);
+		
+		// y_divisions.emplace_back(right_height);	// replace with possible subdivision
+		if(pinch_height > quarter_difference)
+		{
+			const double n_divs = std::round(pinch_height/quarter_difference);
+			const double delta = pinch_height/n_divs;
+
+			for(unsigned int i = 0; i < n_divs; ++i)
+				y_divisions.emplace_back(delta);
+		}
+		else
+		{
+			y_divisions.emplace_back(pinch_height);
+		} /** @todo may want to account for very thin second channel and refine outer bulk */
+
+		y_divisions.emplace_back(quarter_difference);
+		y_divisions.emplace_back(quarter_difference);
+
+		this->buffer_y_divisions = y_divisions;
+	} // set y divisions
+} // constructor
 
 // class parameters:
 template<int dim>
@@ -4122,10 +4157,19 @@ private:
 	bool tileable;
 	unsigned int n_tiles;
 
+	bool addBuffers;
+	double left_buffer;
+	double right_buffer;
+	double max_cell_size;
+
 	std::shared_ptr<BuilderBase<dim> >		builder;
 
 	void tile_geometry(Geometry<dim>& geo) const;
 	void tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const;
+
+	void add_geometry_buffers(Geometry<dim>& geo) const;
+	void add_mesh_buffers(const Geometry<dim>& geo, Triangulation<dim>& tria) const;
+
 
 	// options to extrude to 3D here!
 	// bool extrudeable;
@@ -4140,7 +4184,11 @@ template<int dim>
 GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 	:
 	tileable(true),
-	n_tiles(1)
+	n_tiles(1),
+	addBuffers(false),
+	left_buffer(0),
+	right_buffer(0),
+	max_cell_size(0)
 {
 	const std::string section = "Geometry";
 	std::string geometry_type = prm.get_string(section, "Geometry type");
@@ -4174,6 +4222,13 @@ GeometryBuilder<dim>::GeometryBuilder(const ParameterHandler& prm)
 		throw std::runtime_error("Invalid geometry type: <" + geometry_type + ">");
 
 	n_tiles = prm.get_unsigned(section, "Number tiles");
+
+	// buffers:
+	addBuffers = prm.get_bool(section, "Add buffers");
+	left_buffer = prm.get_double(section, "Left buffer");
+	right_buffer = prm.get_double(section, "Right buffer");
+
+	max_cell_size = prm.get_double("Mesh","Max cell size");
 }
 
 /** \brief Declare all parameters for all builder classes */
@@ -4190,6 +4245,9 @@ GeometryBuilder<dim>::declare_parameters(ParameterHandler& prm)
 		          "Splitter, Funnel, BowTie, or File. For File, name of file must also be"
 		          "provided in the \"Geometry file\" parameter. ");
 		prm.declare_entry("Number tiles", "1", Patterns::Unsigned());
+		prm.declare_entry("Add buffers","False",Patterns::Bool());
+		prm.declare_entry("Left buffer","0",Patterns::Double());
+		prm.declare_entry("Right buffer","0",Patterns::Double());
 	prm.leave_subsection();
 
 	GridGenerationTools::declare_parameters(prm); 
@@ -4217,6 +4275,10 @@ GeometryBuilder<dim>::build_geometry(Geometry<dim>& geo) const
 	if(tileable && (n_tiles > 1))
 		tile_geometry(geo);
 
+	// buffer
+	if(addBuffers)
+		add_geometry_buffers(geo);
+
 	if(dim == 3)
 	{
 		extrude_geometry(geo); // now, may not want for all base geometries
@@ -4237,6 +4299,10 @@ GeometryBuilder<dim>::build_grid(const Geometry<dim>& geo, Triangulation<dim>& t
 	// tile
 	if(tileable && (n_tiles > 1))
 		tile_mesh(geo, tria);
+
+	// buffer
+	if(addBuffers)
+		add_mesh_buffers(geo, tria);
 
 	if(dim == 3)
 		extrude_mesh(geo, tria);
@@ -4325,6 +4391,24 @@ GeometryBuilder<dim>::tile_geometry(Geometry<dim>& geo) const
 	}
 }
 
+
+template<int dim>
+void 
+GeometryBuilder<dim>::add_geometry_buffers(Geometry<dim>& geo) const
+{
+	// enlarge x bound left and right wards:
+	// add left buffer:
+	Point<dim> bl = geo.getBottomLeftPoint();
+	bl[0] = bl[0] - left_buffer;
+	geo.setBottomLeftPoint(bl);
+
+	// add right buffer:
+	Point<dim> tr = geo.getTopRightPoint();
+	tr[0] = tr[0] + right_buffer;
+	geo.setTopRightPoint(tr);
+
+}
+
 template<int dim>
 void 
 GeometryBuilder<dim>::tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tria) const
@@ -4333,7 +4417,13 @@ GeometryBuilder<dim>::tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tr
 	aux.copy_triangulation(tria);
 
 	Tensor<1, dim> shift_vector;
-	shift_vector[0] = geo.getWidth(0)/((double)n_tiles); // get width along x direction of base geometry
+
+	double geowidth = geo.getWidth(0);
+
+	if(addBuffers)
+		geowidth -= (left_buffer + right_buffer); // base geometry with does not include buffers
+
+	shift_vector[0] = geowidth/((double)n_tiles); // get width along x direction of base geometry
 
 	for(unsigned int dim_itr = 1; dim_itr < dim; ++dim_itr)
 		shift_vector[dim_itr] = 0.;
@@ -4348,6 +4438,55 @@ GeometryBuilder<dim>::tile_mesh(const Geometry<dim>& geo, Triangulation<dim>& tr
 		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
 	}
 }
+
+template<int dim>
+void 
+GeometryBuilder<dim>::add_mesh_buffers(const Geometry<dim>& geo, Triangulation<dim>& tria) const
+{
+
+	const std::vector<double> y_divisions = builder->getBufferYDivisions();
+	const double dx = ((max_cell_size < 1e-8)? std::min(left_buffer,right_buffer) : max_cell_size);
+
+	// left buffer:
+	{
+		Triangulation<dim> aux;
+
+		Point<dim> lower = geo.getBottomLeftPoint(); // already shifted back by left
+	    Point<dim> upper = geo.getTopRightPoint();
+	    upper[0] = lower[0] + left_buffer;
+
+		const std::vector<double> x_divisions = GridGenerationTools::getSteps(left_buffer, dx);
+		const std::vector<std::vector<double> > step_sizes = {x_divisions, y_divisions};
+
+		dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+													step_sizes, // get from base...
+													lower,
+													upper); // want divisions to match base...
+
+		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+	}
+
+	// right buffer:
+	{
+		Triangulation<dim> aux;
+
+		Point<dim> lower = geo.getBottomLeftPoint();
+	    Point<dim> upper = geo.getTopRightPoint(); // already shifted up by right
+	    lower[0] = upper[0] - right_buffer;
+
+		const std::vector<double> x_divisions = GridGenerationTools::getSteps(right_buffer, dx);
+		const std::vector<std::vector<double> > step_sizes = {x_divisions, y_divisions};
+
+		dealii::GridGenerator::subdivided_hyper_rectangle(aux,
+													step_sizes, // get from base...
+													lower,
+													upper); // want divisions to match base...
+
+		dealii::GridGenerator::merge_triangulations(aux, tria, tria);
+	}
+
+}
+
 
 /** \brief Option to extrude 2d base geometry to 3d */
 /** @todo still need to implement, many of the templated classes above only need to

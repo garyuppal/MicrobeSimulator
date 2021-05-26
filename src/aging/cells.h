@@ -41,8 +41,18 @@ public:
 	void update(double dt, const Aging::Fitness<dim>& fit);
 
 	std::vector<Point<dim> > getLocations() const;
-	double getConsumptionRate() const;
+	
+	// secretion/consumption:
 
+	// double getConsumptionRate() const;
+	std::vector<double> getSecretionRates() const;
+	double getSecretionRate(unsigned int i) const;
+
+	std::vector<double> getConsumptionRates() const;
+	double getConsumptionRate(unsigned int i) const;
+
+	// checking/output
+	unsigned int getSize() const;
 	bool isAlive() const;
 
 	void printInfo(std::ostream& out) const;
@@ -50,9 +60,9 @@ public:
 private:
 	std::vector<Point<dim> > locations;
 
-	double consumption_rate;
+	std::vector<double> secretion_rates;
+	std::vector<double> consumption_rates;
 };
-
 
 // IMPL
 // -------------------------------------------------------------------
@@ -67,7 +77,14 @@ Cells<dim>::declare_parameters(ParameterHandler& prm)
 	prm.enter_subsection("Cells");
 		prm.declare_entry("Number cells", "1", Patterns::Unsigned());
 		prm.declare_entry("Save cells", "True",Patterns::Bool());
-		prm.declare_entry("Consumption rate","0",Patterns::Double());
+		prm.declare_entry("Save counts", "False",Patterns::Bool());
+		
+		prm.declare_entry("Secretion rates",
+				"{0}",
+				Patterns::List(Patterns::Double()));
+		prm.declare_entry("Consumption rates",
+				"{0}",
+				Patterns::List(Patterns::Double()));
 	prm.leave_subsection();
 }
 
@@ -76,7 +93,9 @@ void
 Cells<dim>::init(const ParameterHandler& prm)
 {
 	const std::string section = "Cells";
-	consumption_rate = prm.get_double(section, "Consumption rate");
+
+	secretion_rates = prm.get_double_vector(section,"Secretion rates");
+	consumption_rates = prm.get_double_vector(section,"Consumption rates");
 
 	const unsigned int number_cells = prm.get_unsigned(section, "Number cells");
 
@@ -93,7 +112,7 @@ Cells<dim>::update(double dt, const Aging::Fitness<dim>& fit)
 {
 	for(auto it = locations.begin(); it != locations.end(); )
 	{
-		const double death_rate = dt*(fit.value(*it)); // probability of death
+		const double death_rate = dt*std::fabs(fit.value(*it)); // probability of death
 		double prob = Utility::getRand();
 
 		if(prob < death_rate )
@@ -111,10 +130,40 @@ Cells<dim>::getLocations() const
 }
 
 template<int dim>
-double
-Cells<dim>::getConsumptionRate() const
+std::vector<double> 
+Cells<dim>::getSecretionRates() const
 {
-	return consumption_rate;
+	return secretion_rates;
+}
+
+template<int dim>
+double 
+Cells<dim>::getSecretionRate(unsigned int i) const
+{
+	// assert(i < secretion_rates.size());
+	return secretion_rates[i];
+}
+
+template<int dim>
+std::vector<double> 
+Cells<dim>::getConsumptionRates() const
+{
+	return consumption_rates;
+}
+
+template<int dim>
+double 
+Cells<dim>::getConsumptionRate(unsigned int i) const
+{
+	// assert(i < consumption_rates.size());
+	return consumption_rates[i];
+}
+
+template<int dim>
+unsigned int 
+Cells<dim>::getSize() const
+{
+	return locations.size();
 }
 
 template<int dim>
@@ -131,9 +180,19 @@ Cells<dim>::printInfo(std::ostream& out) const
 {
 	out << "\n\n" << Utility::medium_line << std::endl 
 		<< "\t\t CELLS INFO:" << std::endl
-		<< Utility::medium_line << std::endl
-		<< "Consumption rate: " << consumption_rate << std::endl
-		<< std::endl << Utility::medium_line << std::endl
+		<< Utility::medium_line << std::endl;
+
+	out << "Secretion rates: ";
+	for(unsigned int i = 0; i < secretion_rates.size(); ++i)
+		out << secretion_rates[i] << " ";
+	out << std::endl;
+
+	out << "Consumption rates: ";
+	for(unsigned int i = 0; i < consumption_rates.size(); ++i)
+		out << consumption_rates[i] << " ";
+	out << std::endl;
+
+	out << std::endl << Utility::medium_line << std::endl
 		<< std::endl << std::endl;
 }
 

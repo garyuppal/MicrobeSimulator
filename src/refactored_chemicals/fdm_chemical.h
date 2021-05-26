@@ -49,6 +49,12 @@ public:
 						const std::vector<double>& amounts,
 						const Function<dim>& control_function) override;
 
+	void update(const SourcesAndSinks<dim>& ss) override;
+
+	void update(const std::vector<Point<dim> >& source_locations, 
+						const std::vector<double>& sources,
+						const std::vector<Point<dim> >& sink_locations, 
+						const std::vector<double>& sinks) override;
 
 	// integrate field over total volume 
 	double getMass() const override;
@@ -421,6 +427,26 @@ FDMChemical<dim>::update(const std::vector<Point<dim> >& locations,
 	updateControls(control_function);
 	addAux();	
 }
+
+// WITH SINKS: ...to be implemented
+template<int dim>
+void 
+FDMChemical<dim>::update(const SourcesAndSinks<dim>& /*ss*/)
+{
+	throw std::runtime_error("update with ss not yet implemented");
+}
+
+template<int dim>
+void 
+FDMChemical<dim>::update(const std::vector<Point<dim> >& /*source_locations*/, 
+					const std::vector<double>& /*sources*/,
+					const std::vector<Point<dim> >& /*sink_locations*/, 
+					const std::vector<double>& /*sinks*/)
+{
+	throw std::runtime_error("update with separate sources and sinks not yet implemented for fdm chemicals");
+}
+
+
 
 /** \brief integrate field over total volume */
 template<int dim>

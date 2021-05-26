@@ -34,6 +34,8 @@ public:
 
 	void output(std::string output_directory, 
 		unsigned int save_step_number) const; 
+	void output(std::string output_directory, 
+		unsigned int save_step_number, unsigned int run_number) const;
 
 	void printInfo(std::ostream& out) const;
 private:
@@ -108,7 +110,7 @@ Chemicals<dim>::update(const std::vector<Point<dim> >& source_locations,
 	* @todo generalize to mutliple chemicsls 
 	*/
 	for(unsigned int i = 0; i < chemicals.size(); ++i)
-		chemicals[i]->update(source_locations, sources, sink_locations, sinks);
+		chemicals[i]->update(source_locations, sources[i], sink_locations, sinks[i]);
 }
 
 template<int dim>
@@ -131,6 +133,28 @@ Chemicals<dim>::output(std::string output_directory,
 							+ "_" 
 							+ dealii::Utilities::int_to_string(save_step_number,4)
 							+ ".vtk"; // might want to change format dynamically ...
+								// can set based on impl given by prm...
+		std::ofstream out(outfile);
+
+		chemicals[i]->print(out); 
+	}
+}
+
+template<int dim>
+void 
+Chemicals<dim>::output(std::string output_directory, 
+	unsigned int save_step_number, unsigned int run_number) const
+{
+	for(unsigned int i = 0; i < chemicals.size(); ++i)
+	{
+		std::string outfile = output_directory
+							+ "/Chemical_"
+							+ dealii::Utilities::int_to_string(i, 2)
+							+ "_R" 
+							+ dealii::Utilities::int_to_string(run_number,4)
+							+ "_" 
+							+ dealii::Utilities::int_to_string(save_step_number,4)
+							+ ".dat"; // might want to change format dynamically ...
 								// can set based on impl given by prm...
 		std::ofstream out(outfile);
 

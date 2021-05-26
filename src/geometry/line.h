@@ -34,6 +34,8 @@ public:
 	// signed distance, return infinity if not orthogonal to line segment
 
 	bool is_in_bounds(const Point<dim>& p, const double buffer=0) const;
+	bool isInBoundingBox(const Point<dim>& p) const;
+
 	
 	Tensor<1, dim> getNormalVector(const Point<dim>& p) const;
 	
@@ -283,7 +285,13 @@ template<int dim>
 bool 
 Line<dim>::is_in_bounds(const Point<dim>& p, const double buffer) const
 {
+	// first simply check line segment's bounding box 
+		// (also to help with possible clashing boundary lines)
+	if( !isInBoundingBox(p) )
+		return true; // is not in bounding box, then is in bounds relative to this segment
+
 	const double dist = distance_from_line(p);
+
 	// is in bounds relative to this line if dist is infinite, 
 	// (no way to handle point if infinite)
 	if( std::isinf(dist) )
@@ -292,6 +300,28 @@ Line<dim>::is_in_bounds(const Point<dim>& p, const double buffer) const
 	// if finite, is in bounds only if positive and greater than buffer
 	if( dist < buffer)
 		return false;
+
+	return true;
+}
+
+template<int dim>
+bool
+Line<dim>::isInBoundingBox(const Point<dim>& p) const
+{
+	// what if slope is zero or infinite... // pass for now, so is in box
+	if( ( std::fabs(slope) < 1e-8) || ( std::fabs(perpendicular_slope) < 1e-8) )
+		return true;
+
+	for(unsigned int dim_itr = 0; dim_itr < dim; ++dim_itr)
+	{
+		const double upper = std::max( left[dim_itr], right[dim_itr] );
+		const double lower = std::min( left[dim_itr], right[dim_itr] );
+
+		// check if between left and right for all dimensions
+		if( (p[dim_itr] < lower) || (p[dim_itr] > upper) )
+			return false;
+	}
+
 	return true;
 }
 

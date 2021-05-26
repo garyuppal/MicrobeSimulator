@@ -187,7 +187,44 @@ GaussianSolution<dim>::setTime(double t)
 	time = t;
 }
 
+} // NAMESPACE: TestFunctions
 
+namespace ExactFunctions{
+
+template<int dim>
+class Constant : public dealii::Function<dim>{
+public:
+	Constant();
+	Constant(double v);
+
+	double value(const Point<dim>& p,
+		const unsigned int component = 0) const override;
+
+private:
+	double val;
+};
+
+// IMPL
+// ------------------------------------------------------------
+template<int dim>
+Constant<dim>::Constant()
+	:
+	val(0)
+{}
+
+template<int dim>
+Constant<dim>::Constant(double v)
+	:
+	val(v)
+{}
+
+template<int dim>
+double
+Constant<dim>::value(const Point<dim>& /*p*/,
+		const unsigned int /* component */) const
+{
+	return val;
+}
 
 
 }} // CLOSE NAMESPACES
